@@ -1970,6 +1970,43 @@ bool Car::FireWeapon(int weapon, TargetType* target)
     {
         return false;
     }
+
+    // Cars historically only supported a turret machine gun or a horn.  Some
+    // wheeled launchers, however, carry real missile magazines without a
+    // turret.  Launch them from the matching animated maverick proxy so both
+    // the visible rack and the trajectory use the same config animation.
+    if (weapon >= 0 && weapon < NMagazineSlots())
+    {
+        const WeaponModeType* mode = GetWeaponMode(weapon);
+        if (mode && mode->_ammo && mode->_ammo->_simulation == AmmoShotMissile)
+        {
+            if (!GetWeaponLoaded(weapon) || !IsFireEnabled())
+            {
+                return false;
+            }
+
+            Magazine* magazine = GetMagazineSlot(weapon)._magazine;
+            if (!magazine || !magazine->_type)
+            {
+                return false;
+            }
+
+            bool found = false;
+            Matrix4 launch = FindMissileTransform(magazine->_ammo, found);
+            Vector3 pos = found ? launch.Position() : (HasTurret() ? Type()->_turret._pos : Vector3(0, 2, 0));
+            Vector3 dir = found ? launch.Direction() : VForward;
+            dir.Normalize();
+
+            const bool fired =
+                FireMissile(weapon, pos, dir, dir * magazine->_type->_initSpeed, target);
+            if (fired)
+            {
+                VehicleWithAI::FireWeapon(weapon, target);
+            }
+            return fired;
+        }
+    }
+
     if (HasTurret())
     {
         if (weapon >= NMagazineSlots())
@@ -2187,6 +2224,21 @@ bool Car::AimWeapon(int weapon, Target* target)
 
 Vector3 Car::GetWeaponDirectionWanted(int weapon) const
 {
+    if (weapon >= 0 && weapon < NMagazineSlots())
+    {
+        const WeaponModeType* mode = GetWeaponMode(weapon);
+        const Magazine* magazine = GetMagazineSlot(weapon)._magazine;
+        if (mode && mode->_ammo && mode->_ammo->_simulation == AmmoShotMissile && magazine)
+        {
+            bool found = false;
+            Matrix4 launch = FindMissileTransform(magazine->_ammo, found);
+            if (found)
+            {
+                return Transform().Rotate(launch.Direction());
+            }
+        }
+    }
+
     if (!HasTurret())
     {
         return Direction();
@@ -2199,6 +2251,21 @@ Vector3 Car::GetWeaponDirectionWanted(int weapon) const
 
 Vector3 Car::GetWeaponDirection(int weapon) const
 {
+    if (weapon >= 0 && weapon < NMagazineSlots())
+    {
+        const WeaponModeType* mode = GetWeaponMode(weapon);
+        const Magazine* magazine = GetMagazineSlot(weapon)._magazine;
+        if (mode && mode->_ammo && mode->_ammo->_simulation == AmmoShotMissile && magazine)
+        {
+            bool found = false;
+            Matrix4 launch = FindMissileTransform(magazine->_ammo, found);
+            if (found)
+            {
+                return Transform().Rotate(launch.Direction());
+            }
+        }
+    }
+
     if (!HasTurret())
     {
         return Direction();
@@ -2210,6 +2277,21 @@ Vector3 Car::GetWeaponDirection(int weapon) const
 
 Vector3 Car::GetWeaponCenter(int weapon) const
 {
+    if (weapon >= 0 && weapon < NMagazineSlots())
+    {
+        const WeaponModeType* mode = GetWeaponMode(weapon);
+        const Magazine* magazine = GetMagazineSlot(weapon)._magazine;
+        if (mode && mode->_ammo && mode->_ammo->_simulation == AmmoShotMissile && magazine)
+        {
+            bool found = false;
+            Matrix4 launch = FindMissileTransform(magazine->_ammo, found);
+            if (found)
+            {
+                return launch.Position();
+            }
+        }
+    }
+
     if (!HasTurret())
     {
         return VZero;

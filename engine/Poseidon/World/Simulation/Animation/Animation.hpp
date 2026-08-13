@@ -173,6 +173,10 @@ public:
 	(
 		LODShape *shape, int level, float phase, Matrix4Par baseAnim
 	) = 0;
+	// Apply this config animation to a proxy transform.  Visual geometry is
+	// animated through Animate(), while proxies keep a separate transform and
+	// therefore need the same phase expressed as a matrix.
+	virtual void AnimateMatrix(Matrix4 &mat, float phase, int level) const = 0;
 	virtual void Deanimate(LODShape *shape, int level) = 0;
 };
 
@@ -190,6 +194,7 @@ public:
 
 	int GetSelection(int level) const override;
 	void Animate(LODShape *shape, int level, float phase, Matrix4Par baseAnim) override;
+	void AnimateMatrix(Matrix4 &mat, float phase, int level) const override;
 	void Deanimate(LODShape *shape, int level) override;
 };
 
@@ -214,6 +219,7 @@ public:
 
 	int GetSelection(int level) const;
 	void Animate(LODShape *shape, int level, Matrix4Par baseAnim);
+	void AnimateMatrix(Matrix4 &mat, int level) const;
 	void Deanimate(LODShape *shape, int level);
 
 protected:

@@ -452,6 +452,11 @@ class Entity: public Object
 
 	void Animate( int level ) override;
 	void Deanimate( int level ) override;
+	// Apply config-defined animations whose selection contains the supplied
+	// proxy selection. This is intentionally separate from AnimateMatrix(),
+	// which represents built-in vehicle animations and is used as the base
+	// transform while animating visual geometry.
+	void ApplyProxyAnimations(Matrix4 &mat, int level, int selection) const;
 
 	bool MustBeSaved() const override {return true;}
 

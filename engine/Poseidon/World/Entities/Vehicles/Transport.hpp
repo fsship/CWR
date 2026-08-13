@@ -904,6 +904,7 @@ protected:
 	(
 		int level, const FrameBase &pos, float dist2
 	) const override;
+	Matrix4 FindMissileTransform(int index, bool &found) const;
 	Vector3 FindMissilePos(int index, bool &found) const;
 
 	int PassNum( int lod ) override;

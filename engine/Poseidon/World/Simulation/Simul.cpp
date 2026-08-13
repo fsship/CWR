@@ -1343,6 +1343,43 @@ void Entity::SetAnimationPhase(RString animation, float phase)
     }
 }
 
+void Entity::ApplyProxyAnimations(Matrix4& mat, int level, int selection) const
+{
+    if (!_shape || level < 0 || level >= _shape->NLevels() || selection < 0)
+    {
+        return;
+    }
+
+    Shape* shape = _shape->Level(level);
+    if (!shape || selection >= shape->NNamedSel())
+    {
+        return;
+    }
+
+    const NamedSelection& proxySelection = shape->NamedSel(selection);
+    for (int i = 0; i < _animations.Size(); i++)
+    {
+        const int animationSelection = _animations[i].GetSelection(level);
+        if (animationSelection < 0 || animationSelection >= shape->NNamedSel())
+        {
+            continue;
+        }
+
+        // Selection::IsSubset(other) answers whether `other` is contained in
+        // the receiver. A three-point proxy selection is therefore animated
+        // when all of its points belong to the larger launcher selection.
+        const NamedSelection& animatedSelection = shape->NamedSel(animationSelection);
+        if (animatedSelection.IsSubset(proxySelection))
+        {
+            _animations[i].AnimateMatrix(mat, level);
+        }
+    }
+
+    // Compose built-in vehicle transforms (turrets, SCUD animation, etc.)
+    // outside the config animation, matching Entity::Animate's baseAnim * rot.
+    AnimateMatrix(mat, level, selection);
+}
+
 bool Entity::IsAnimated(int level) const
 {
     if (base::IsAnimated(level))

@@ -1386,6 +1386,15 @@ void AnimationRotationType::Animate(LODShape* shape, int level, float phase, Mat
     _animation.Transform(shape, baseAnim * rot, level);
 }
 
+void AnimationRotationType::AnimateMatrix(Matrix4& mat, float phase, int level) const
+{
+    saturate(phase, 0, 1);
+    const float angle = _angle0 + phase * (_angle1 - _angle0);
+    Matrix4 rot;
+    _animation.GetRotation(rot, angle, level);
+    mat = rot * mat;
+}
+
 void AnimationRotationType::Deanimate(LODShape* shape, int level)
 {
     _animation.Restore(shape, level);
@@ -1411,6 +1420,14 @@ void AnimationInstance::Animate(LODShape* shape, int level, Matrix4Par baseAnim)
 {
     AdvanceTime();
     _type->Animate(shape, level, _phase, baseAnim);
+}
+
+void AnimationInstance::AnimateMatrix(Matrix4& mat, int level) const
+{
+    if (_type)
+    {
+        _type->AnimateMatrix(mat, _phase, level);
+    }
 }
 
 void AnimationInstance::Deanimate(LODShape* shape, int level)

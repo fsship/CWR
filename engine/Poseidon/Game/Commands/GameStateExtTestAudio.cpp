@@ -1535,6 +1535,81 @@ GameValue TriPlayerVehicle(const GameState* /*state*/)
     return GameValue(buf);
 }
 
+/// triPlayerVehicleMissilePose — return the selected missile proxy's model-space
+/// launch position and direction as "px,py,pz,dx,dy,dz". This lets integration
+/// tests verify that config animations affect both the visible rack and the
+/// actual missile trajectory.
+GameValue TriPlayerVehicleMissilePose(const GameState* /*state*/)
+{
+    if (!GWorld || !GWorld->GetRealPlayer() || !GWorld->GetRealPlayer()->Brain())
+        return GameValue("FAIL:no_player");
+    Transport* veh = GWorld->GetRealPlayer()->Brain()->GetVehicleIn();
+    if (!veh)
+        return GameValue("FAIL:not_in_vehicle");
+    int weapon = veh->SelectedWeapon();
+    if (weapon < 0 || weapon >= veh->NMagazineSlots())
+        return GameValue("FAIL:no_weapon");
+    const MagazineSlot& slot = veh->GetMagazineSlot(weapon);
+    if (!slot._magazine)
+        return GameValue("FAIL:no_magazine");
+
+    bool found = false;
+    Matrix4 launch = veh->FindMissileTransform(slot._magazine->_ammo, found);
+    if (!found)
+        return GameValue("FAIL:no_proxy");
+
+    Vector3Val position = launch.Position();
+    Vector3Val direction = launch.Direction();
+    char buf[192];
+    snprintf(buf, sizeof(buf), "%.6f,%.6f,%.6f,%.6f,%.6f,%.6f", position.X(), position.Y(), position.Z(),
+             direction.X(), direction.Y(), direction.Z());
+    return GameValue(buf);
+}
+
+/// triPlayerVehicleWeaponState — compact diagnostics for the selected vehicle
+/// weapon. Registered only in test/harness mode.
+GameValue TriPlayerVehicleWeaponState(const GameState* /*state*/)
+{
+    if (!GWorld || !GWorld->GetRealPlayer() || !GWorld->GetRealPlayer()->Brain())
+        return GameValue("FAIL:no_player");
+    Transport* veh = GWorld->GetRealPlayer()->Brain()->GetVehicleIn();
+    if (!veh)
+        return GameValue("FAIL:not_in_vehicle");
+    int weapon = veh->SelectedWeapon();
+    if (weapon < 0)
+        weapon = 0;
+
+    const MagazineSlot* slot = weapon < veh->NMagazineSlots() ? &veh->GetMagazineSlot(weapon) : nullptr;
+    const WeaponModeType* mode = weapon < veh->NMagazineSlots() ? veh->GetWeaponMode(weapon) : nullptr;
+    const Magazine* magazine = slot ? slot->_magazine : nullptr;
+    char buf[256];
+    snprintf(buf, sizeof(buf),
+             "weapon=%d,loaded=%d,fireEnabled=%d,pilot=%d,local=%d,upY=%.6f,ammo=%d,reload=%.6f,"
+             "reloadMagazine=%.6f,simulation=%d",
+             weapon, weapon < veh->NMagazineSlots() && veh->GetWeaponLoaded(weapon), veh->IsFireEnabled(),
+             veh->PilotUnit() != nullptr, veh->IsLocal(), veh->DirectionUp().Y(),
+             magazine ? static_cast<int>(magazine->_ammo) : -1,
+             magazine ? static_cast<float>(magazine->_reload) : -1.0f,
+             magazine ? static_cast<float>(magazine->_reloadMagazine) : -1.0f,
+             mode && mode->_ammo ? static_cast<int>(mode->_ammo->_simulation) : -1);
+    return GameValue(buf);
+}
+
+/// triAdvancePlayerVehicleAnimations — force one visual animation pass for
+/// dummy-render integration tests, where no model draw would normally advance
+/// AnimationInstance::_phase.
+GameValue TriAdvancePlayerVehicleAnimations(const GameState* /*state*/)
+{
+    if (!GWorld || !GWorld->GetRealPlayer() || !GWorld->GetRealPlayer()->Brain())
+        return GameValue(-1.0f);
+    Transport* veh = GWorld->GetRealPlayer()->Brain()->GetVehicleIn();
+    if (!veh)
+        return GameValue(-1.0f);
+    veh->Animate(0);
+    veh->Deanimate(0);
+    return GameValue(veh->GetAnimationPhase("LauncherElevation"));
+}
+
 /// triPlayerName — returns the selected player profile name
 /// (Glob.header.playerName), set by startup profile selection.
 GameValue TriPlayerName(const GameState* /*state*/)
@@ -2895,6 +2970,10 @@ INIT_MODULE(GameStateExtTest, 3)
     GGameState.NewFunction(GameFunction(GameString, "triCheatInfiniteFuel", TriCheatInfiniteFuel, GameBool));
     GGameState.NewFunction(GameFunction(GameString, "triCheatInfiniteArmor", TriCheatInfiniteArmor, GameBool));
     GGameState.NewNularOp(GameNular(GameString, "triPlayerVehicle", TriPlayerVehicle));
+    GGameState.NewNularOp(GameNular(GameString, "triPlayerVehicleMissilePose", TriPlayerVehicleMissilePose));
+    GGameState.NewNularOp(GameNular(GameString, "triPlayerVehicleWeaponState", TriPlayerVehicleWeaponState));
+    GGameState.NewNularOp(
+        GameNular(GameScalar, "triAdvancePlayerVehicleAnimations", TriAdvancePlayerVehicleAnimations));
     GGameState.NewNularOp(GameNular(GameString, "triPlayerName", TriPlayerName));
     GGameState.NewNularOp(GameNular(GameString, "triPlayerFace", TriPlayerFace));
     GGameState.NewFunction(GameFunction(GameString, "triSetPlayerPref", TriSetPlayerPref, GameString));

@@ -1,0 +1,88 @@
+version=11;
+class Mission
+{
+    addOns[]={"CWR_Radar_HMMWV"};
+    randomSeed=12082026;
+    class Intel
+    {
+        startWeather=0.150000;
+        forecastWeather=0.150000;
+        hour=12.000000;
+    };
+    class Groups
+    {
+        items=1;
+        class Item0
+        {
+            side="WEST";
+            class Vehicles
+            {
+                items=1;
+                class Item0
+                {
+                    position[]={6710.527832,82.907585,5408.891602};
+                    id=0;
+                    side="WEST";
+                    vehicle="SoldierWB";
+                    player="PLAYER COMMANDER";
+                    leader=1;
+                    rank="CAPTAIN";
+                    skill=0.900000;
+                    init="this moveInDriver radar_hmmwv";
+                };
+            };
+        };
+    };
+    class Vehicles
+    {
+        items=3;
+        class Item0
+        {
+            position[]={6710.527832,82.907585,5408.891602};
+            azimut=0;
+            id=10;
+            side="EMPTY";
+            vehicle="CWR_RadarHMMWV";
+            skill=0.900000;
+            text="radar_hmmwv";
+            markers[]={};
+        };
+        class Item1
+        {
+            position[]={6710.527832,82.907585,5580.891602};
+            azimut=180;
+            id=11;
+            side="EMPTY";
+            vehicle="T72";
+            skill=0.500000;
+            text="target_one";
+            markers[]={};
+        };
+        class Item2
+        {
+            position[]={6740.527832,82.907585,5610.891602};
+            azimut=180;
+            id=12;
+            side="EMPTY";
+            vehicle="T80";
+            skill=0.500000;
+            text="target_two";
+            markers[]={};
+        };
+    };
+};
+class Intro
+{
+    randomSeed=12082027;
+    class Intel {};
+};
+class OutroWin
+{
+    randomSeed=12082028;
+    class Intel {};
+};
+class OutroLoose
+{
+    randomSeed=12082029;
+    class Intel {};
+};

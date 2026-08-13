@@ -2403,8 +2403,10 @@ void Transport::DrawProxies(int level, ClipFlags clipFlags, const Matrix4& trans
             {
                 continue;
             }
-            Matrix4Val pTransform = transform * obj->Transform();
-            Matrix4Val invPTransform = proxy.invTransform * invTransform;
+            Matrix4 proxyTransform = obj->Transform();
+            ApplyProxyAnimations(proxyTransform, level, proxy.selection);
+            Matrix4Val pTransform = transform * proxyTransform;
+            Matrix4Val invPTransform = pTransform.InverseScaled();
 
             LODShapeWithShadow* pshape = GetMissileShape();
             if (!pshape)
@@ -2491,7 +2493,9 @@ int Transport::GetProxyComplexity(int level, const FrameBase& pos, float dist2) 
             {
                 continue;
             }
-            Matrix4Val pTransform = pos.Transform() * proxy.obj->Transform();
+            Matrix4 proxyTransform = proxy.obj->Transform();
+            ApplyProxyAnimations(proxyTransform, level, proxy.selection);
+            Matrix4Val pTransform = pos.Transform() * proxyTransform;
 
             LODShapeWithShadow* pshape = obj->GetShapeOnPos(pTransform.Position());
             if (!pshape)
@@ -2505,7 +2509,7 @@ int Transport::GetProxyComplexity(int level, const FrameBase& pos, float dist2) 
                 continue;
             }
 
-            Matrix4Val invPTransform = proxy.invTransform * pos.GetInvTransform();
+            Matrix4Val invPTransform = pTransform.InverseScaled();
             FrameWithInverse pFrame(pTransform, invPTransform);
 
             nFaces += obj->GetComplexity(level, pFrame);
@@ -2515,14 +2519,28 @@ int Transport::GetProxyComplexity(int level, const FrameBase& pos, float dist2) 
     return nFaces;
 }
 
-Vector3 Transport::FindMissilePos(int index, bool& found) const
+Matrix4 Transport::FindMissileTransform(int index, bool& found) const
 {
     found = false;
+    if (!_shape || _shape->NLevels() <= 0)
+    {
+        return MIdentity;
+    }
+
     Shape* sShape = _shape->LevelOpaque(0);
+    if (!sShape)
+    {
+        return MIdentity;
+    }
+
     for (int i = 0; i < sShape->NProxies(); i++)
     {
         const ProxyObject& proxy = sShape->Proxy(i);
         Object* obj = proxy.obj;
+        if (!obj)
+        {
+            continue;
+        }
         const EntityType* type = obj->GetVehicleType();
         if (!type)
         {
@@ -2537,10 +2555,17 @@ Vector3 Transport::FindMissilePos(int index, bool& found) const
             continue;
         }
         found = true;
-        return proxy.obj->Position();
+        Matrix4 transform = proxy.obj->Transform();
+        ApplyProxyAnimations(transform, 0, proxy.selection);
+        return transform;
     }
 
-    return VZero;
+    return MIdentity;
+}
+
+Vector3 Transport::FindMissilePos(int index, bool& found) const
+{
+    return FindMissileTransform(index, found).Position();
 }
 
 bool Transport::GetOpticsCamera(Matrix4& transf, CameraType camType) const

@@ -1887,7 +1887,11 @@ bool EntityAI::FireMissile(int weapon, Vector3Par offset, Vector3Par direction, 
     Entity* shot = NewShot(this, type, target);
     Vector3 wDirection(NoInit);
     DirectionModelToWorld(wDirection, direction.Normalized());
-    shot->SetOrient(wDirection, VUp);
+    // A vertical launcher makes the direction parallel to the usual world-up
+    // reference.  SetDirectionAndUp cannot build an orthogonal frame from two
+    // parallel vectors, so use world-forward as the reference in that case.
+    Vector3Val orientUp = fabs(wDirection * VUp) > 0.99f ? VForward : VUp;
+    shot->SetOrient(wDirection, orientUp);
     shot->SetSpeed(_speed + DirectionModelToWorld(initSpeed));
     shot->SetPosition(PositionModelToWorld(offset));
     GLOB_WORLD->AddFastVehicle(shot);

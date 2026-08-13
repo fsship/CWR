@@ -8,18 +8,28 @@ function(find_llvm_root OUTPUT_VAR ARCH)
         set(${OUTPUT_VAR} "" PARENT_SCOPE)
         return()
     endif()
-    if(ARCH STREQUAL "x86")
+
+    # Allow a portable LLVM toolchain (for example in a local build/tools
+    # directory) while retaining the conventional system install as default.
+    if(POSEIDON_LLVM_ROOT)
+        set(LLVM_DIR "${POSEIDON_LLVM_ROOT}")
+    elseif(DEFINED ENV{POSEIDON_LLVM_ROOT} AND NOT "$ENV{POSEIDON_LLVM_ROOT}" STREQUAL "")
+        set(LLVM_DIR "$ENV{POSEIDON_LLVM_ROOT}")
+    elseif(ARCH STREQUAL "x86")
         set(LLVM_DIR "C:/Program Files (x86)/LLVM")
     elseif(ARCH STREQUAL "x64")
         set(LLVM_DIR "C:/Program Files/LLVM")
     else()
         message(FATAL_ERROR "Unsupported architecture: ${ARCH}")
     endif()
+
+    file(TO_CMAKE_PATH "${LLVM_DIR}" LLVM_DIR)
     
     if(EXISTS "${LLVM_DIR}")
         set(${OUTPUT_VAR} "${LLVM_DIR}" PARENT_SCOPE)
     else()
-        message(FATAL_ERROR "LLVM not found at ${LLVM_DIR}")
+        message(FATAL_ERROR
+            "LLVM not found at ${LLVM_DIR}; set POSEIDON_LLVM_ROOT to a valid LLVM installation")
     endif()
 endfunction()
 

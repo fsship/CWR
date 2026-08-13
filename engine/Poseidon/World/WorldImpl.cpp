@@ -2239,7 +2239,8 @@ void World::StartIntro()
                 {
                     if (!StartAutoTest())
                     {
-                        LOG_ERROR(Core, "StartAutoTest could not boot '{}'", LoadFile);
+                        LOG_ERROR(Core, "StartAutoTest could not boot '{}': {}", LoadFile,
+                            (const char*)GetMaxErrorMessage());
                         if (AppConfig::Instance().IsMissionSmokeCheck())
                         {
                             LOG_ERROR(Core, "Mission smoke check failed: StartAutoTest could not boot '{}'", LoadFile);
