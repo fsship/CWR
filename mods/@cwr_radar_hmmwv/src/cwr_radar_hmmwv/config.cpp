@@ -5,7 +5,10 @@ class CfgPatches
         units[] = {"CWR_RadarHMMWV"};
         weapons[] = {};
         requiredVersion = 1.99;
-        requiredAddons[] = {"HMMWV"};
+        // CAS_TaticMissile is supplied by the CAS_AH31A resource PBO.
+        // Declaring the dependency unlocks that existing definition before
+        // this vehicle's weapon bank is initialized.
+        requiredAddons[] = {"HMMWV", "CAS_AH31A"};
     };
 };
 
@@ -21,14 +24,19 @@ class CfgVehicles
     class Car: LandVehicle {};
     class Jeep: Car {};
     class HMMWV: Jeep {};
+    // Vanilla Tank deliberately disables IR targeting.  A radar-equipped
+    // launcher needs armour to participate in the lockable target list.
+    class Tank: LandVehicle
+    {
+        irTarget = 1;
+    };
 
     class CWR_RadarHMMWV: HMMWV
     {
         scope = 2;
         side = 1;
-        displayName = "HMMWV Radar / Maverick";
+        displayName = "HMMWV Radar / TaticMissile";
         vehicleClass = "Armored";
-        model = "\cwr_radar_hmmwv\cwr_radar_hmmwv.p3d";
         picture = "\humr\ihmmwv.paa";
 
         armor = 120;
@@ -36,8 +44,18 @@ class CfgVehicles
         threat[] = {0.8, 0.95, 0.7};
         transportSoldier = 1;
 
-        weapons[] = {"MaverickLauncher"};
-        magazines[] = {"MaverickLauncher"};
+        // Car has no unit-info overlay. Reuse the tank overlay so its tactical
+        // radar is visible, and make the driver the vehicle commander.
+        unitInfoType = 1;
+        driverIsCommander = 1;
+        commanderCanSee = 31;
+        driverCanSee = 31;
+
+        weapons[] = {"CAS_TaticMissile"};
+        magazines[] = {"CAS_TaticMissile"};
+        mountedMaverickRack = 1;
+        mountedRackObliqueModel = "\cwr_radar_hmmwv\cwr_radar_rack_45.p3d";
+        mountedRackVerticalModel = "\cwr_radar_hmmwv\cwr_radar_rack_90.p3d";
 
         // Functional ground-search radar / laser designation capability.
         irScanRangeMin = 500;
@@ -50,14 +68,11 @@ class CfgVehicles
         {
             class LauncherElevation
             {
-                type = "rotation";
+                // The radar/launcher pack is rendered as an external model,
+                // so retain an ordinary named animation state without trying
+                // to animate selections in the stock HMMWV model.
+                type = "state";
                 animPeriod = 0.8;
-                selection = "launcher_bank";
-                axis = "launcher_axis";
-                angle0 = 0;
-                // The model is authored at 45 degrees. In Poseidon's model
-                // rotation convention, -45 degrees around +X points it upward.
-                angle1 = -0.785398163;
             };
         };
 

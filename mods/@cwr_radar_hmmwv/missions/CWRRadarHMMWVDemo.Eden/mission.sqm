@@ -11,7 +11,7 @@ class Mission
     };
     class Groups
     {
-        items=1;
+        items=2;
         class Item0
         {
             side="WEST";
@@ -29,6 +29,34 @@ class Mission
                     rank="CAPTAIN";
                     skill=0.900000;
                     init="this moveInDriver radar_hmmwv";
+                };
+            };
+        };
+        class Item1
+        {
+            side="EAST";
+            class Vehicles
+            {
+                items=2;
+                class Item0
+                {
+                    position[]={6710.527832,82.907585,5580.891602};
+                    id=1;
+                    side="EAST";
+                    vehicle="SoldierEB";
+                    leader=1;
+                    rank="LIEUTENANT";
+                    skill=0.750000;
+                    init="this moveInDriver target_one; target_one engineOn true";
+                };
+                class Item1
+                {
+                    position[]={6740.527832,82.907585,5610.891602};
+                    id=2;
+                    side="EAST";
+                    vehicle="SoldierEB";
+                    skill=0.750000;
+                    init="this moveInDriver target_two; target_two engineOn true";
                 };
             };
         };

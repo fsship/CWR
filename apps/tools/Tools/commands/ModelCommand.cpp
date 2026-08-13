@@ -384,20 +384,33 @@ static void addQuad(P3DM::Mesh& mesh, uint32_t a, uint32_t b, uint32_t c, uint32
 static std::vector<uint32_t> addBox(P3DM::Mesh& mesh, const P3DM::Vector3& center, const P3DM::Vector3& half,
                                     uint32_t material, uint32_t& faceIndex)
 {
+    // UVs and normals are stored per vertex.  A box therefore cannot share its
+    // eight corners between faces: doing so would force every side to sample
+    // the same texture coordinate and have the same lighting normal.  This was
+    // particularly visible on the radar panel and launcher pylons.
     std::vector<uint32_t> v;
-    v.reserve(8);
-    for (int y = -1; y <= 1; y += 2)
-        for (int z = -1; z <= 1; z += 2)
-            for (int x = -1; x <= 1; x += 2)
-                v.push_back(addVertex(mesh, {center.x + x * half.x, center.y + y * half.y, center.z + z * half.z}));
+    v.reserve(24);
 
-    // Index layout: y-major, then z, then x.
-    addQuad(mesh, v[0], v[1], v[3], v[2], material, faceIndex);
-    addQuad(mesh, v[4], v[6], v[7], v[5], material, faceIndex);
-    addQuad(mesh, v[0], v[4], v[5], v[1], material, faceIndex);
-    addQuad(mesh, v[2], v[3], v[7], v[6], material, faceIndex);
-    addQuad(mesh, v[0], v[2], v[6], v[4], material, faceIndex);
-    addQuad(mesh, v[1], v[5], v[7], v[3], material, faceIndex);
+    const auto point = [&](int x, int y, int z) {
+        return P3DM::Vector3{center.x + x * half.x, center.y + y * half.y, center.z + z * half.z};
+    };
+    const auto addFace = [&](const P3DM::Vector3& normal, const P3DM::Vector3& a, const P3DM::Vector3& b,
+                             const P3DM::Vector3& c, const P3DM::Vector3& d) {
+        const uint32_t ia = addVertex(mesh, a, normal, 0.0f, 0.0f);
+        const uint32_t ib = addVertex(mesh, b, normal, 1.0f, 0.0f);
+        const uint32_t ic = addVertex(mesh, c, normal, 1.0f, 1.0f);
+        const uint32_t id = addVertex(mesh, d, normal, 0.0f, 1.0f);
+        v.insert(v.end(), {ia, ib, ic, id});
+        addQuad(mesh, ia, ib, ic, id, material, faceIndex);
+    };
+
+    // Counter-clockwise winding viewed from outside.
+    addFace({0, -1, 0}, point(-1, -1, -1), point(1, -1, -1), point(1, -1, 1), point(-1, -1, 1));
+    addFace({0, 1, 0}, point(-1, 1, -1), point(-1, 1, 1), point(1, 1, 1), point(1, 1, -1));
+    addFace({0, 0, -1}, point(-1, -1, -1), point(-1, 1, -1), point(1, 1, -1), point(1, -1, -1));
+    addFace({0, 0, 1}, point(-1, -1, 1), point(1, -1, 1), point(1, 1, 1), point(-1, 1, 1));
+    addFace({-1, 0, 0}, point(-1, -1, -1), point(-1, -1, 1), point(-1, 1, 1), point(-1, 1, -1));
+    addFace({1, 0, 0}, point(1, -1, -1), point(1, 1, -1), point(1, 1, 1), point(1, -1, 1));
     return v;
 }
 
@@ -489,8 +502,10 @@ static void appendRadarHMMWVVisuals(P3DM::Mesh& mesh, unsigned detail)
     uint32_t faceIndex = nextFaceIndex(mesh);
     std::vector<uint32_t> launcherVertices;
 
-    // HMMWV coordinate system: +X right, +Y up, +Z forward. Both banks start at 45 degrees elevation.
-    const P3DM::Vector3 forwardUp{0.0f, std::sin(kPi / 4.0f), std::cos(kPi / 4.0f)};
+    // HMMWV shapes are loaded with `reversed=1`, which mirrors X/Z at
+    // runtime.  Author the banks toward -Z so their runtime direction is the
+    // vehicle's forward +Z. Both banks start at 45 degrees elevation.
+    const P3DM::Vector3 forwardUp{0.0f, std::sin(kPi / 4.0f), -std::cos(kPi / 4.0f)};
     const P3DM::Vector3 launcherAxisCenter{0.0f, 1.82f, 0.08f};
 
     // A central cross beam and two AH-64-style four-rail banks.
@@ -602,6 +617,288 @@ static void recalculateModelBounds(P3DM::Model& model)
                 model.boundingSphere.radius =
                     std::max(model.boundingSphere.radius, length(sub(vertex.position, model.boundingCenter)));
 }
+
+// Keep the legacy LODShape representation when writing the generated model.
+// SaveOptimized faithfully round-trips its original per-face texture objects,
+// while serializing an ODOL through the generic Model/ShapeAdapter path loses
+// the original material sections and causes texture pages to be assigned to
+// unrelated HMMWV faces.
+static int addLegacyVertex(Shape& mesh, Vector3Par pos, Vector3Par normal, float u = 0.0f, float v = 0.0f)
+{
+    return mesh.AddVertexFast(pos, normal, ClipAll, u, v);
+}
+
+static void addLegacyFace(Shape& mesh, const std::vector<int>& vertices, Texture* texture, int special = 0)
+{
+    Poly face;
+    face.Init();
+    face.SetN(static_cast<VertexIndex>(vertices.size()));
+    for (int i = 0; i < static_cast<int>(vertices.size()); ++i)
+    {
+        face.Set(i, static_cast<VertexIndex>(vertices[static_cast<size_t>(i)]));
+    }
+    face.SetTexture(texture);
+    face.SetSpecial(special);
+    mesh.AddFace(face);
+}
+
+static std::vector<int> addLegacyBox(Shape& mesh, Vector3Par center, Vector3Par half, Texture* texture)
+{
+    std::vector<int> allVertices;
+    allVertices.reserve(24);
+    const auto point = [&](float x, float y, float z) {
+        return Vector3(center.X() + x * half.X(), center.Y() + y * half.Y(), center.Z() + z * half.Z());
+    };
+    const auto addFace = [&](Vector3Par normal, Vector3Par a, Vector3Par b, Vector3Par c, Vector3Par d) {
+        const int ia = addLegacyVertex(mesh, a, normal, 0.0f, 0.0f);
+        const int ib = addLegacyVertex(mesh, b, normal, 1.0f, 0.0f);
+        const int ic = addLegacyVertex(mesh, c, normal, 1.0f, 1.0f);
+        const int id = addLegacyVertex(mesh, d, normal, 0.0f, 1.0f);
+        allVertices.insert(allVertices.end(), {ia, ib, ic, id});
+        addLegacyFace(mesh, {ia, ib, ic, id}, texture);
+    };
+
+    addFace(Vector3(0, -1, 0), point(-1, -1, -1), point(1, -1, -1), point(1, -1, 1), point(-1, -1, 1));
+    addFace(Vector3(0, 1, 0), point(-1, 1, -1), point(-1, 1, 1), point(1, 1, 1), point(1, 1, -1));
+    addFace(Vector3(0, 0, -1), point(-1, -1, -1), point(-1, 1, -1), point(1, 1, -1), point(1, -1, -1));
+    addFace(Vector3(0, 0, 1), point(-1, -1, 1), point(1, -1, 1), point(1, 1, 1), point(-1, 1, 1));
+    addFace(Vector3(-1, 0, 0), point(-1, -1, -1), point(-1, -1, 1), point(-1, 1, 1), point(-1, 1, -1));
+    addFace(Vector3(1, 0, 0), point(1, -1, -1), point(1, 1, -1), point(1, 1, 1), point(1, -1, 1));
+    return allVertices;
+}
+
+static std::vector<int> addLegacyCylinder(Shape& mesh, Vector3Par start, Vector3Par end, float radius, int sides,
+                                          Texture* texture)
+{
+    const Vector3 axis = (end - start).Normalized();
+    const Vector3 reference = fabs(axis.Y()) < 0.95f ? Vector3(0, 1, 0) : Vector3(1, 0, 0);
+    const Vector3 right = axis.CrossProduct(reference).Normalized();
+    const Vector3 up = right.CrossProduct(axis).Normalized();
+    std::vector<int> vertices;
+    vertices.reserve(static_cast<size_t>(sides) * 2 + 2);
+    for (int ring = 0; ring < 2; ++ring)
+    {
+        const Vector3 center = ring == 0 ? start : end;
+        for (int i = 0; i < sides; ++i)
+        {
+            const float angle = 2.0f * kPi * static_cast<float>(i) / static_cast<float>(sides);
+            const Vector3 radial = right * cos(angle) + up * sin(angle);
+            vertices.push_back(addLegacyVertex(mesh, center + radial * radius, radial,
+                                                static_cast<float>(i) / static_cast<float>(sides),
+                                                static_cast<float>(ring)));
+        }
+    }
+    const int c0 = addLegacyVertex(mesh, start, -axis, 0.5f, 0.5f);
+    const int c1 = addLegacyVertex(mesh, end, axis, 0.5f, 0.5f);
+    for (int i = 0; i < sides; ++i)
+    {
+        const int j = (i + 1) % sides;
+        const int a = vertices[static_cast<size_t>(i)];
+        const int b = vertices[static_cast<size_t>(j)];
+        const int c = vertices[static_cast<size_t>(sides + j)];
+        const int d = vertices[static_cast<size_t>(sides + i)];
+        addLegacyFace(mesh, {a, b, c, d}, texture);
+        addLegacyFace(mesh, {c0, b, a}, texture);
+        addLegacyFace(mesh, {c1, d, c}, texture);
+    }
+    return vertices;
+}
+
+static void addLegacySelection(Shape& mesh, const char* name, const std::vector<int>& vertices,
+                               const std::vector<int>& faces = {})
+{
+    std::vector<Poseidon::SelInfo> points;
+    points.reserve(vertices.size());
+    for (const int vertex : vertices)
+    {
+        points.emplace_back(static_cast<VertexIndex>(vertex), 255);
+    }
+    std::vector<VertexIndex> faceIndices;
+    faceIndices.reserve(faces.size());
+    for (const int face : faces)
+    {
+        faceIndices.push_back(static_cast<VertexIndex>(face));
+    }
+    mesh.AddNamedSel(Poseidon::NamedSelection(name, points.empty() ? nullptr : points.data(),
+                                               static_cast<int>(points.size()),
+                                               faceIndices.empty() ? nullptr : faceIndices.data(),
+                                               static_cast<int>(faceIndices.size())));
+}
+
+static void appendLegacyRadarHMMWVVisuals(Shape& mesh, unsigned detail)
+{
+    Texture* black = mesh.FindTexture("data\\blck_sum.pac");
+    if (!black)
+        black = mesh.NTextures() > 0 ? mesh.GetTexture(0) : nullptr;
+    // One known-good opaque stock material keeps the newly-authored rails
+    // stable across every HMMWV visual LOD. Some of the old camouflage pages
+    // are not safely reusable in a standalone generated ODOL.
+    Texture* green = black;
+
+    std::vector<int> launcherVertices;
+    // HMMWV shapes are loaded reversed at runtime. Authoring toward -Z makes
+    // the launch rails and missile proxies point forward (+Z) in the game.
+    const Vector3 forwardUp(0.0f, sin(kPi / 4.0f), -cos(kPi / 4.0f));
+    const Vector3 axisCenter(0.0f, 1.82f, 0.08f);
+
+    // The visible Mavericks define the rack silhouette.  Keep the parent
+    // beam deliberately face-free: ODOL's legacy material writer can turn a
+    // newly authored opaque beam into a white full-size box at runtime.
+
+    int proxyNumber = 1;
+    for (const int sideSign : {-1, 1})
+    {
+        const float sideX = static_cast<float>(sideSign) * 1.26f;
+
+        for (int rail = 0; rail < 4; ++rail)
+        {
+            const float column = (rail & 1) ? 0.13f : -0.13f;
+            const float row = rail < 2 ? 0.11f : -0.11f;
+            const Vector3 railCenter(sideX + column, 1.89f + row, 0.11f);
+
+            const Vector3 proxyOrigin = railCenter - forwardUp * 0.38f;
+            const Vector3 proxyUp = forwardUp.CrossProduct(Vector3(1, 0, 0)).Normalized() * 0.17f;
+            const int p0 = addLegacyVertex(mesh, proxyOrigin, proxyUp, 0.0f, 0.0f);
+            const int p1 = addLegacyVertex(mesh, proxyOrigin + forwardUp * 0.10f, proxyUp, 1.0f, 0.0f);
+            const int p2 = addLegacyVertex(mesh, proxyOrigin + proxyUp, proxyUp, 0.0f, 1.0f);
+            launcherVertices.insert(launcherVertices.end(), {p0, p1, p2});
+            const int proxyFace = mesh.NFaces();
+            addLegacyFace(mesh, {p0, p1, p2}, nullptr, IsHiddenProxy | NoTexMerger);
+
+            char selectionName[64];
+            std::snprintf(selectionName, sizeof(selectionName), "proxy:cwr_maverick.%02d", proxyNumber++);
+            addLegacySelection(mesh, selectionName, {p0, p1, p2}, {proxyFace});
+        }
+    }
+
+    // The radar geometry is appended to the standalone rack model below.
+
+    addLegacySelection(mesh, "launcher_bank", launcherVertices);
+    mesh.FindSections();
+    mesh.CalculateMinMax();
+    mesh.StoreOriginalMinMax();
+}
+
+static void appendLegacyLauncherAxis(Shape& mesh)
+{
+    const int first = addLegacyVertex(mesh, Vector3(-0.50f, 1.82f, 0.08f), VUp);
+    const int second = addLegacyVertex(mesh, Vector3(0.50f, 1.82f, 0.08f), VUp);
+    addLegacySelection(mesh, "launcher_axis", {first, second});
+    mesh.CalculateMinMax();
+    mesh.StoreOriginalMinMax();
+}
+
+// Keep the original HMMWV mesh out of this generated P3D.  The legacy ODOL
+// writer can faithfully handle our simple new geometry, but some original
+// HMMWV visual LODs use shared vertices with texture-coordinate layouts the
+// writer cannot round-trip.  Rendering the stock model as a proxy leaves its
+// bytes (and therefore all body/wheel material mappings) completely intact.
+static void addLegacyHMMWVProxy(Shape& mesh)
+{
+    // The parent vehicle and the stock HMMWV proxy are both reversed. Author
+    // +Z here so the parent reversal gives the proxy -Z, cancelling the
+    // child's own reversal and preserving the original vehicle orientation.
+    const Vector3 origin(0.0f, 0.0f, 0.0f);
+    const Vector3 forward(0.0f, 0.0f, 0.10f);
+    const Vector3 up(0.0f, 0.10f, 0.0f);
+    const int p0 = addLegacyVertex(mesh, origin, VUp);
+    const int p1 = addLegacyVertex(mesh, origin + forward, VUp);
+    const int p2 = addLegacyVertex(mesh, origin + up, VUp);
+    const int proxyFace = mesh.NFaces();
+    addLegacyFace(mesh, {p0, p1, p2}, nullptr, IsHiddenProxy | NoTexMerger);
+    // GReplaceProxies resolves proxy:plainhmmwv to the hidden ProxyPlainHMMWV class,
+    // which inherits the original model and its reversed=1 setting.
+    addLegacySelection(mesh, "proxy:plainhmmwv.01", {p0, p1, p2}, {proxyFace});
+}
+
+static Shape* makeLegacyRadarHMMWVVisual(const Shape& sourceVisual, Texture* sharedBlack, unsigned detail)
+{
+    auto* visual = new Shape();
+    // The attachments borrow only texture references from the stock model;
+    // no stock vertex or face data is copied into this P3D.
+    visual->AddTextureUnique(sharedBlack ? sharedBlack : sourceVisual.FindTexture("data\\blck_sum.pac"));
+    addLegacyHMMWVProxy(*visual);
+    appendLegacyRadarHMMWVVisuals(*visual, detail);
+    visual->FindSections();
+    visual->CalculateMinMax();
+    visual->StoreOriginalMinMax();
+    return visual;
+}
+
+static Shape* makeLegacyMountedMaverick(Texture* texture, unsigned detail)
+{
+    auto* missile = new Shape();
+    missile->AddTextureUnique(texture);
+
+    // This is deliberately a compact store model, not the fired Maverick
+    // mesh. The latter includes long rocket-flame surfaces and is only used
+    // after launch. +Z is the model-forward convention used by the proxy.
+    addLegacyCylinder(*missile, Vector3(0.0f, 0.0f, -1.05f), Vector3(0.0f, 0.0f, 1.05f), 0.095f,
+                      detail == 0 ? 10 : 6, texture);
+    addLegacyBox(*missile, Vector3(0.0f, 0.0f, -0.62f), Vector3(0.43f, 0.018f, 0.19f), texture);
+    addLegacyBox(*missile, Vector3(0.0f, 0.0f, 0.58f), Vector3(0.30f, 0.014f, 0.14f), texture);
+    missile->FindSections();
+    missile->CalculateMinMax();
+    missile->StoreOriginalMinMax();
+    return missile;
+}
+
+static Shape* makeLegacyMountedRack(Texture* texture, unsigned detail, float elevation)
+{
+    auto* rack = new Shape();
+    rack->AddTextureUnique(texture);
+
+    const Vector3 forwardUp(0.0f, sin(elevation), cos(elevation));
+    const Vector3 axisCenter(0.0f, 1.82f, 0.08f);
+    addLegacyBox(*rack, axisCenter, Vector3(1.42f, 0.07f, 0.08f), texture);
+
+    for (const int sideSign : {-1, 1})
+    {
+        const float sideX = static_cast<float>(sideSign) * 1.26f;
+        addLegacyBox(*rack, Vector3(sideX, 1.88f, 0.10f), Vector3(0.15f, 0.21f, 0.20f), texture);
+        for (int rail = 0; rail < 4; ++rail)
+        {
+            const float column = (rail & 1) ? 0.13f : -0.13f;
+            const float row = rail < 2 ? 0.11f : -0.11f;
+            const Vector3 railCenter(sideX + column, 1.89f + row, 0.11f);
+            addLegacyCylinder(*rack, railCenter - forwardUp * 0.70f, railCenter + forwardUp * 0.70f,
+                              detail < 2 ? 0.095f : 0.08f, detail == 0 ? 8 : 6, texture);
+            // Compact visible store: 2.1 m long and matched to the selected
+            // rack elevation. The projectile itself is still spawned by the
+            // real Maverick launcher.
+            addLegacyCylinder(*rack, railCenter - forwardUp * 1.05f, railCenter + forwardUp * 1.05f, 0.095f,
+                              detail == 0 ? 10 : 6, texture);
+            const Vector3 right(1.0f, 0.0f, 0.0f);
+            const Vector3 up = forwardUp.CrossProduct(right).Normalized();
+            const Vector3 finCenter = railCenter - forwardUp * 0.62f;
+            addLegacyBox(*rack, finCenter, Vector3(0.34f, 0.015f, 0.15f), texture);
+            (void)up;
+        }
+    }
+
+    // Fixed radar mast and panel, intentionally independent from the
+    // elevation setting.
+    addLegacyCylinder(*rack, Vector3(0.0f, 1.78f, -0.32f), Vector3(0.0f, 2.72f, -0.32f), 0.075f,
+                      detail == 0 ? 10 : 6, texture);
+    addLegacyCylinder(*rack, Vector3(0.0f, 2.64f, -0.32f), Vector3(0.0f, 2.79f, -0.32f), 0.27f,
+                      detail == 0 ? 12 : 8, texture);
+    addLegacyBox(*rack, Vector3(0.0f, 3.00f, -0.32f), Vector3(0.68f, 0.32f, 0.055f), texture);
+    addLegacyBox(*rack, Vector3(0.0f, 3.33f, -0.32f), Vector3(0.75f, 0.035f, 0.09f), texture);
+    addLegacyBox(*rack, Vector3(0.0f, 2.67f, -0.32f), Vector3(0.75f, 0.035f, 0.09f), texture);
+    rack->FindSections();
+    rack->CalculateMinMax();
+    rack->StoreOriginalMinMax();
+    return rack;
+}
+
+static void writeLegacyMountedRack(const std::filesystem::path& path, Texture* texture, float elevation)
+{
+    std::unique_ptr<LODShapeWithShadow> rack(new LODShapeWithShadow());
+    for (unsigned detail = 0; detail < 3; ++detail)
+        rack->AddShape(makeLegacyMountedRack(texture, detail, elevation), 1.0f + detail * 2.0f);
+    rack->CalculateMinMax(true);
+    rack->SaveOptimized(path.string().c_str());
+}
 } // namespace
 
 static void setupModelRadarHMMWV(CLI::App& model)
@@ -615,49 +912,72 @@ static void setupModelRadarHMMWV(CLI::App& model)
     cmd->callback(
         [&]()
         {
-            P3DM::Model generated;
-            try
+            std::unique_ptr<LODShapeWithShadow> source(new LODShapeWithShadow());
+            if (!source->LoadOptimized(inputPath.c_str()))
             {
-                generated = Poseidon::Asset::Formats::ODOLLoader::load(inputPath);
-            }
-            catch (const std::exception& e)
-            {
-                std::cerr << "Error: Failed to load base ODOL: " << e.what() << std::endl;
+                std::cerr << "Error: Failed to load base ODOL: " << inputPath << std::endl;
                 throw CLI::RuntimeError(1);
             }
 
+            std::unique_ptr<LODShapeWithShadow> generated(new LODShapeWithShadow());
+            Texture* sharedBlack = source->FindTexture("data\\blck_sum.pac");
             unsigned visualIndex = 0;
-            for (auto& lod : generated.lodLevels)
-                if (lod.resolution < 1000.0f)
-                    appendRadarHMMWVVisuals(lod.mesh, visualIndex++);
+            for (int i = 0; i < source->NLevels(); ++i)
+            {
+                const float resolution = source->Resolution(i);
+                if (resolution < 1000.0f)
+                {
+                    generated->AddShape(makeLegacyRadarHMMWVVisual(*source->Level(i), sharedBlack, visualIndex),
+                                        resolution);
+                    ++visualIndex;
+                }
+                else if (resolution >= 1.0e13f)
+                {
+                    // Preserve only collision, memory, path and shadow data.
+                    // Cockpit/visual LODs are intentionally excluded so no
+                    // stock textured faces are ever reserialized.
+                    generated->AddShape(new Shape(*source->Level(i)), resolution);
+                }
+            }
 
-            const int memoryIndex = static_cast<int>(generated.memoryIdx);
-            if (memoryIndex < 0 || memoryIndex >= static_cast<int>(generated.lodLevels.size()))
+            Shape* memory = generated->MemoryLevel();
+            if (!memory)
             {
                 std::cerr << "Error: Base ODOL has no valid Memory LOD index" << std::endl;
                 throw CLI::RuntimeError(1);
             }
-            appendLauncherAxis(generated.lodLevels[static_cast<size_t>(memoryIndex)].mesh);
-            recalculateModelBounds(generated);
+            appendLegacyLauncherAxis(*memory);
+            generated->RescanProxies();
+            // Rebuild section ranges only after proxy faces are marked hidden.  This
+            // keeps the base model's original per-face texture assignments intact.
+            for (int i = 0; i < generated->NLevels(); ++i)
+                generated->Level(i)->FindSections();
+            generated->CalculateMinMax(true);
 
             std::filesystem::path output(outputPath);
             if (!output.parent_path().empty())
                 std::filesystem::create_directories(output.parent_path());
 
-            std::unique_ptr<LODShapeWithShadow> shape(P3DM::ShapeAdapter::convertToLODShape(generated));
-            if (!shape)
-            {
-                std::cerr << "Error: Failed to save generated model: " << outputPath << std::endl;
-                throw CLI::RuntimeError(1);
-            }
-            shape->SaveOptimized(outputPath.c_str());
+            generated->SaveOptimized(outputPath.c_str());
+
+            // Write the matching compact Maverick store model next to the
+            // vehicle. It is selected only while a round remains on a rack;
+            // launch still spawns the original Maverick projectile model.
+            std::unique_ptr<LODShapeWithShadow> mountedMaverick(new LODShapeWithShadow());
+            for (unsigned detail = 0; detail < 3; ++detail)
+                mountedMaverick->AddShape(makeLegacyMountedMaverick(sharedBlack, detail), 1.0f + detail * 2.0f);
+            mountedMaverick->CalculateMinMax(true);
+            const std::filesystem::path mountedMaverickPath = output.parent_path() / "cwr_maverick_proxy.p3d";
+            mountedMaverick->SaveOptimized(mountedMaverickPath.string().c_str());
+            writeLegacyMountedRack(output.parent_path() / "cwr_radar_rack_45.p3d", sharedBlack, kPi / 4.0f);
+            writeLegacyMountedRack(output.parent_path() / "cwr_radar_rack_90.p3d", sharedBlack, kPi / 2.0f);
 
             std::cout << "Generated radar HMMWV: " << outputPath << std::endl;
             std::cout << "  Visual LODs modified: " << visualIndex << std::endl;
             std::cout << "  Per visual LOD: 2 x four-rail banks, 8 Maverick proxies, radar mast/panel, launcher_bank"
                       << std::endl;
-            std::cout << "  Memory LOD " << memoryIndex << ": launcher_axis along +X" << std::endl;
-            std::cout << "  Initial elevation: 45 degrees; rotate launcher_bank -45 degrees about launcher_axis for vertical"
+            std::cout << "  Memory LOD: launcher_axis along +X" << std::endl;
+            std::cout << "  Initial elevation: forward 45 degrees; rotate launcher_bank +45 degrees about launcher_axis for vertical"
                       << std::endl;
         });
 }

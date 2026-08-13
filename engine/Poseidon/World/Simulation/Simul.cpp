@@ -1416,6 +1416,12 @@ void Entity::Animate(int level)
             AnimateMatrix(baseAnim, level, _animations[i].GetSelection(level));
             _animations[i].Animate(_shape, level, baseAnim);
         }
+        else
+        {
+            // State-only animations drive external vehicle equipment and have
+            // no selection in this model, but still need their phase advanced.
+            _animations[i].Animate(_shape, level, MIdentity);
+        }
     }
 
     base::Animate(level);

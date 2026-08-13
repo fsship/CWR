@@ -198,6 +198,19 @@ public:
 	void Deanimate(LODShape *shape, int level) override;
 };
 
+// A named animation state with no geometry of its own.  It is useful for
+// vehicles whose animated equipment is rendered by a separate model: scripts
+// can still use the normal `animate` / `animationPhase` interface and the
+// renderer can select the matching external model from its phase.
+class AnimationStateType : public AnimationType
+{
+public:
+	int GetSelection(int level) const override { return -1; }
+	void Animate(LODShape *shape, int level, float phase, Matrix4Par baseAnim) override {}
+	void AnimateMatrix(Matrix4 &mat, float phase, int level) const override {}
+	void Deanimate(LODShape *shape, int level) override {}
+};
+
 class AnimationInstance
 {
 protected:

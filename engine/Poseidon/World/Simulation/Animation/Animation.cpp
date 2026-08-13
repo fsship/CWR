@@ -1334,6 +1334,12 @@ AnimationType* AnimationType::CreateObject(const ParamEntry& cls, LODShape* shap
         object->Init(cls, shape);
         return object;
     }
+    if (stricmp(type, "state") == 0)
+    {
+        AnimationType* object = new AnimationStateType();
+        object->Init(cls, shape);
+        return object;
+    }
 
     Fail("Unknown animation type");
     return nullptr;

@@ -884,6 +884,9 @@ class LODShape: public RefCountWithLinks
 	void CheckForcedProperties();
 	void ScanProperties();
 	void ScanProxies(bool modifyFaces = true);
+	// Rebuild the proxy table from named proxy selections. This is useful for
+	// editor/tooling code that adds proxy selections after a shape has loaded.
+	void RescanProxies(bool modifyFaces = true);
 	void CalculateMass(); // always use best level
 
 	void RecalculateGeomComponents() const {_geomComponents->Recalculate(GeometryLevel());}

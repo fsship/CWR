@@ -2385,6 +2385,32 @@ void Transport::DrawProxies(int level, ClipFlags clipFlags, const Matrix4& trans
                        Type()->_hideWeaponsCargo);
     }
 
+    // Vehicles that retain a stock body model can opt into an externally
+    // rendered launcher/radar pack. This avoids reserializing old ODOL body
+    // LODs (whose shared UV data is not writable) while keeping the equipment
+    // visually anchored in vehicle model space.
+    const float launcherPhase = GetAnimationPhase("LauncherElevation");
+    RString mountedRackModel =
+        Type()->GetParamEntry() >> (launcherPhase >= 0.5f ? "mountedRackVerticalModel" : "mountedRackObliqueModel");
+    if (mountedRackModel.GetLength() > 0)
+    {
+        LODShapeWithShadow* rackShape = Shapes.New(::GetShapeName(mountedRackModel), false, true);
+        if (rackShape)
+        {
+            int rackLevel = GScene->LevelFromDistance2(rackShape, dist2, transform.Scale(), transform.Direction(),
+                                                       GScene->GetCamera()->Direction());
+            if (rackLevel != LOD_INVISIBLE)
+            {
+                Shape* rackVisual = rackShape->LevelOpaque(rackLevel);
+                if (rackVisual)
+                {
+                    rackVisual->PrepareTextures(z2, rackVisual->Special());
+                    rackVisual->Draw(this, lights, ClipAll, rackVisual->Special(), transform, invTransform);
+                }
+            }
+        }
+    }
+
     int nMissiles = CountMissiles();
 
     Shape* sShape = _shape->LevelOpaque(level);
@@ -2408,7 +2434,14 @@ void Transport::DrawProxies(int level, ClipFlags clipFlags, const Matrix4& trans
             Matrix4Val pTransform = transform * proxyTransform;
             Matrix4Val invPTransform = pTransform.InverseScaled();
 
-            LODShapeWithShadow* pshape = GetMissileShape();
+            // Most legacy aircraft use the fired-ammo model while it is
+            // mounted. Some purpose-built ground launchers instead provide a
+            // compact, textured proxy model for the rack; their fired model
+            // contains a long exhaust/flame mesh and is unsuitable as a
+            // static store. Keep this opt-in so existing aircraft are
+            // untouched.
+            const bool useMountedProxyModel = Type()->GetParamEntry() >> "mountedMissileProxyModel";
+            LODShapeWithShadow* pshape = useMountedProxyModel ? obj->GetShape() : GetMissileShape();
             if (!pshape)
             {
                 continue;
@@ -2422,10 +2455,17 @@ void Transport::DrawProxies(int level, ClipFlags clipFlags, const Matrix4& trans
 
             FrameWithInverse pFrame(pTransform, invPTransform);
 
-            LODShapeWithShadow* oldShape = obj->GetShape();
-            obj->SetShape(pshape);
-            obj->Draw(level, ClipAll, pFrame);
-            obj->SetShape(oldShape);
+            if (useMountedProxyModel)
+            {
+                obj->Draw(level, ClipAll, pFrame);
+            }
+            else
+            {
+                LODShapeWithShadow* oldShape = obj->GetShape();
+                obj->SetShape(pshape);
+                obj->Draw(level, ClipAll, pFrame);
+                obj->SetShape(oldShape);
+            }
         }
     }
 
@@ -2497,7 +2537,9 @@ int Transport::GetProxyComplexity(int level, const FrameBase& pos, float dist2) 
             ApplyProxyAnimations(proxyTransform, level, proxy.selection);
             Matrix4Val pTransform = pos.Transform() * proxyTransform;
 
-            LODShapeWithShadow* pshape = obj->GetShapeOnPos(pTransform.Position());
+            const bool useMountedProxyModel = Type()->GetParamEntry() >> "mountedMissileProxyModel";
+            LODShapeWithShadow* pshape =
+                useMountedProxyModel ? obj->GetShape() : obj->GetShapeOnPos(pTransform.Position());
             if (!pshape)
             {
                 continue;
@@ -2557,6 +2599,32 @@ Matrix4 Transport::FindMissileTransform(int index, bool& found) const
         found = true;
         Matrix4 transform = proxy.obj->Transform();
         ApplyProxyAnimations(transform, 0, proxy.selection);
+        return transform;
+    }
+
+    // A stock-body launcher has no writable visual proxy slots. Its rack is
+    // configured procedurally, so provide the identical model-space origin
+    // and direction to the real Maverick firing path.
+    const bool configuredRack = Type()->GetParamEntry() >> "mountedMaverickRack";
+    if (configuredRack && index >= 1)
+    {
+        // Some missile magazines (such as CAS_TaticMissile) carry more than
+        // the eight visible hardpoints. Reuse the two four-round banks while
+        // preserving their configured launch direction for every round.
+        const int slot = (index - 1) % 8;
+        const float sideX = (slot / 4 == 0) ? -1.26f : 1.26f;
+        const float column = (slot & 1) ? 0.13f : -0.13f;
+        const float row = (slot % 4 < 2) ? 0.11f : -0.11f;
+        const float elevation = H_PI * 0.25f + GetAnimationPhase("LauncherElevation") * H_PI * 0.25f;
+        const Vector3 direction(0.0f, sin(elevation), cos(elevation));
+        const Vector3 up(0.0f, cos(elevation), -sin(elevation));
+
+        Matrix4 transform = MIdentity;
+        transform.SetDirectionAside(Vector3(1.0f, 0.0f, 0.0f));
+        transform.SetDirectionUp(up);
+        transform.SetDirection(direction);
+        transform.SetPosition(Vector3(sideX + column, 1.89f + row, 0.11f));
+        found = true;
         return transform;
     }
 

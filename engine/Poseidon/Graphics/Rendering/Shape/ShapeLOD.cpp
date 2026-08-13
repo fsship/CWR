@@ -1771,6 +1771,18 @@ void LODShape::ScanProxies(bool modifyFaces)
     }
 }
 
+void LODShape::RescanProxies(bool modifyFaces)
+{
+    for (int l = 0; l < _nLods; ++l)
+    {
+        if (_lods[l])
+        {
+            _lods[l]->_proxy.Clear();
+        }
+    }
+    ScanProxies(modifyFaces);
+}
+
 DEFINE_FAST_ALLOCATOR(LODShapeWithShadow)
 LODShapeWithShadow::LODShapeWithShadow() = default;
 

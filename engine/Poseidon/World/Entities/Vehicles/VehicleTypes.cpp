@@ -783,6 +783,9 @@ Object* NewNonAIVehicleQuiet(RString typeName, RString shapeName, bool fullCreat
     }
     else if (!strcmp(simName, "alwaysshow"))
     {
+        // `alwaysshow` is also used by lightweight visual proxy classes.
+        // The type owns the shape so its configured reversed/material setup
+        // is identical to a regular vehicle using the same model.
         v = new ObjectTyped(type->GetShape(), type, -1);
     }
     else if (!strcmp(simName, "maverickweapon"))
@@ -825,7 +828,10 @@ Vehicle* NewNonAIVehicle(RString typeName, RString shapeName, bool fullCreate)
 Object* NewObject(RString typeName, RString shapeName)
 {
     // object created this way are considered temporary
-    Object* v = NewNonAIVehicleQuiet(typeName, "", true);
+    // Keep an explicit proxy model.  Previously this was discarded before
+    // `alwaysshow`/proxy object construction, so every typed proxy rendered
+    // its cached default shape instead of the model named by the P3D proxy.
+    Object* v = NewNonAIVehicleQuiet(typeName, shapeName, true);
     if (v)
     {
         v->SetType(Temporary);

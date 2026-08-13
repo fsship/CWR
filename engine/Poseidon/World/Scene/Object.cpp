@@ -804,6 +804,15 @@ void Object::DrawProxies(int level, ClipFlags clipFlags, const Matrix4& transfor
     {
         const ProxyObject& proxy = sShape->Proxy(i);
 
+        // Transport renders Maverick hardpoints itself so it can select the
+        // appropriate visible missile model and hide a round once it has been
+        // fired.  Drawing the generic proxy here as well exposes the tiny
+        // maverik_proxy placement mesh as a second, often untextured model.
+        // It is only a transform marker, not part of the vehicle artwork.
+        const EntityType* proxyType = proxy.obj ? proxy.obj->GetVehicleType() : nullptr;
+        if (proxyType && !strcmp(proxyType->_simName, "maverickweapon"))
+            continue;
+
         // smart clipping par of obj->Draw
         Matrix4Val pTransform = transform * proxy.obj->Transform();
         Matrix4Val invPTransform = proxy.invTransform * invTransform;
