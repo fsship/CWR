@@ -1268,6 +1268,10 @@ public:
 
 	bool LockPossible( const AmmoType *ammo ) const override;
 	virtual bool CanLock(TargetType *type, int weapon=-1) const;
+	//! Whether this vehicle's radar can acquire the specified entity.
+	//! Most vehicles retain the original IR-target-only behaviour; infantry
+	//! scanning is an explicit per-sensor configuration opt-in.
+	bool CanRadarScanTarget(const EntityAI *target) const;
 
 	virtual bool QIsManual() const = 0;
 

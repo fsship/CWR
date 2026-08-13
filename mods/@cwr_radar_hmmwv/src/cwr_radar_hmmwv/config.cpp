@@ -24,13 +24,6 @@ class CfgVehicles
     class Car: LandVehicle {};
     class Jeep: Car {};
     class HMMWV: Jeep {};
-    // Vanilla Tank deliberately disables IR targeting.  A radar-equipped
-    // launcher needs armour to participate in the lockable target list.
-    class Tank: LandVehicle
-    {
-        irTarget = 1;
-    };
-
     class CWR_RadarHMMWV: HMMWV
     {
         scope = 2;
@@ -62,6 +55,9 @@ class CfgVehicles
         irScanRangeMax = 12000;
         irScanToEyeFactor = 3;
         irScanGround = 1;
+        // This sensor alone may acquire soldiers without globally making
+        // infantry (or any other unit type) an IR target.
+        radarScanInfantry = 1;
         laserScanner = 1;
 
         class Animations

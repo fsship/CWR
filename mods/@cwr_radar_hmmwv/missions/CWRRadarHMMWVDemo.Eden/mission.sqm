@@ -11,7 +11,7 @@ class Mission
     };
     class Groups
     {
-        items=2;
+        items=3;
         class Item0
         {
             side="WEST";
@@ -57,6 +57,25 @@ class Mission
                     vehicle="SoldierEB";
                     skill=0.750000;
                     init="this moveInDriver target_two; target_two engineOn true";
+                };
+            };
+        };
+        class Item2
+        {
+            side="EAST";
+            class Vehicles
+            {
+                items=1;
+                class Item0
+                {
+                    position[]={6710.527832,82.907585,5520.891602};
+                    id=3;
+                    side="EAST";
+                    vehicle="SoldierEB";
+                    leader=1;
+                    rank="PRIVATE";
+                    skill=0.750000;
+                    text="radar_infantry_target";
                 };
             };
         };

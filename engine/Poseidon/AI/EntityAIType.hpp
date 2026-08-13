@@ -520,6 +520,9 @@ class EntityAIType: public EntityType
 	bool _laserTarget; // is laser lock possible (used only for virtual laser target)
 
 	bool _irScanGround; // IR capable of tracking ground targets
+	// Opt-in sensor extension: permits this observer to acquire Man targets
+	// through its ground-search radar even when the target is not an IR target.
+	bool _radarScanInfantry;
 
 	bool _attendant;
 	bool _nightVision;
@@ -597,6 +600,7 @@ class EntityAIType: public EntityType
 	float GetIRScanRange() const;
 	__forceinline bool GetLaserScanner() const {return _laserScanner;}
 	__forceinline bool GetIRScanGround() const {return _irScanGround;} // IR tracks ground targets
+	__forceinline bool GetRadarScanInfantry() const {return _radarScanInfantry;}
 
 	__forceinline bool GetNightVision() const {return _nightVision;}
 

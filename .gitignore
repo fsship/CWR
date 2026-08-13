@@ -24,6 +24,7 @@ imgui.ini
 # Local game data and fixtures
 /assets/
 /games-res/
+/mods/@cwr_radar_hmmwv/editable-config.cpp
 /packages/
 /packages
 /tests/integration/missions/*/sound/

@@ -313,7 +313,7 @@ Target* InGameUI::CheckCursorTarget(Vector3& itPos, Vector3Par cursorDir, const 
             // visible only
             // check distance to target
             float irRange = vehicle->GetType()->GetIRScanRange();
-            if (!veh || !veh->GetType()->GetIRTarget())
+            if (!veh || !vehicle->CanRadarScanTarget(veh))
             {
                 irRange = 0;
             }

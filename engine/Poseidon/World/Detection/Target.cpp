@@ -417,7 +417,7 @@ void TargetList::Manage(AIGroup* group)
             float dist2 = veh->Position().Distance2(ai->Position());
 
             float irRange = veh->GetType()->GetIRScanRange();
-            if (!ai || !ai->GetType()->GetIRTarget())
+            if (!ai || !veh->CanRadarScanTarget(ai))
             {
                 irRange = 0;
             }
@@ -508,10 +508,9 @@ void EntityAI::AddNewTargets(TargetList& res, bool initialize)
             continue;
         }
 
-        const EntityAIType* type = ai->GetType();
         if (dist2 > Square(TACTICAL_VISIBILITY))
         {
-            if (!type->GetIRTarget() || !GetType()->GetIRScanGround() && !ai->Airborne())
+            if (!CanRadarScanTarget(ai) || !GetType()->GetIRScanGround() && !ai->Airborne())
             {
                 continue;
             }
@@ -611,7 +610,7 @@ float EntityAI::CalcVisibility(EntityAI* ai, float dist2, float* audibility, boo
             return 0;
         }
     }
-    bool irScan = dist2 < Square(irRange) && ai->GetType()->GetIRTarget();
+    bool irScan = dist2 < Square(irRange) && CanRadarScanTarget(ai);
     if (!type->GetIRScanGround() && !ai->Airborne())
     {
         irScan = false;
@@ -803,7 +802,7 @@ void EntityAI::TrackTargets(TargetList& res, AIUnit* unit, int canSee, bool init
         }
 
         bool laserContact = (ai->GetType()->GetLaserTarget() && GetType()->GetLaserScanner());
-        bool radarContact = (dist2 < Square(irRange) && ai->GetType()->GetIRTarget() &&
+        bool radarContact = (dist2 < Square(irRange) && CanRadarScanTarget(ai) &&
                              (GetType()->GetIRScanGround() || ai->Airborne()));
 
         Target* assigned = unit->GetTargetAssigned();
@@ -1368,7 +1367,7 @@ float VisibilityTracker::Value(const EntityAI* sensor, int weapon, float reserve
 
         EntityAI* ai = _obj;
         float irRange = sensor->GetType()->GetIRScanRange();
-        if (!ai->GetType()->GetIRTarget())
+        if (!sensor->CanRadarScanTarget(ai))
         {
             irRange = 0;
         }

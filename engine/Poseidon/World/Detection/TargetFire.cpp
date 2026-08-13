@@ -141,7 +141,7 @@ int EntityAI::EstimateAttack(const Vector3& hPos, float height, const EntityAI* 
         {
             return 0;
         }
-        if (!ai->GetType()->GetIRTarget())
+        if (!CanRadarScanTarget(ai))
         {
             irRange = 0;
         }

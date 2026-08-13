@@ -1905,7 +1905,7 @@ void InGameUI::FindTarget(EntityAI* me, bool prev)
         {
             continue; // skip current target
         }
-        if (!ai->GetType()->GetIRTarget() && !ai->GetType()->GetLaserTarget())
+        if (!me->CanRadarScanTarget(ai) && !ai->GetType()->GetLaserTarget())
         {
             continue; // skip non-IR targets
         }

@@ -299,6 +299,7 @@ void PlateInfos::Draw(int level, ClipFlags clipFlags, const FrameBase& pos, cons
 EntityAIType::EntityAIType(const ParamEntry* param) : EntityType(param)
 {
     _scopeLevel = 0;
+    _radarScanInfantry = false;
 }
 
 EntityAIType::~EntityAIType()
@@ -480,6 +481,7 @@ void EntityAIType::Load(const ParamEntry& par)
     }
 
     GET_PAR(irScanGround);
+    GET_PAR(radarScanInfantry);
     GET_PAR(nightVision);
 
     GET_PAR(laserScanner);
@@ -666,6 +668,19 @@ bool EntityAI::CanLock(TargetType* type, int weapon) const
         return false;
     }
     return type->LockPossible(mode->_ammo);
+}
+
+bool EntityAI::CanRadarScanTarget(const EntityAI* target) const
+{
+    if (!target)
+    {
+        return false;
+    }
+
+    const EntityAIType* sensorType = GetType();
+    const EntityAIType* targetType = target->GetType();
+    return targetType->GetIRTarget() ||
+           (sensorType->GetRadarScanInfantry() && targetType->IsKindOf(GWorld->Preloaded(VTypeMan)));
 }
 
 bool EntityAI::LockPossible(const AmmoType* ammo) const
