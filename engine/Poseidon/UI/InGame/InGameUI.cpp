@@ -2011,6 +2011,12 @@ bool InGameUI::LockTargetFromExternal(EntityAI* target)
     return false;
 }
 
+EntityAI *InGameUI::GetLockedTargetForExternal() const
+{
+    EntityAI *target = _lockTarget.IdExact();
+    return target && !target->IsDammageDestroyed() ? target : nullptr;
+}
+
 #define CameraFrame() GScene->GetCamera()
 // #define CameraFrame() GWorld->CameraOn()
 

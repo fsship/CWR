@@ -73,6 +73,11 @@ public:
 	// use this for local tools such as the developer web map.
 	virtual bool LockTargetFromExternal(EntityAI *target) { (void)target; return false; }
 
+	// Exposes the target currently locked by the normal in-game HUD.  This is
+	// deliberately read-only so external displays can reflect the TAB lock
+	// without maintaining a second lock state.
+	virtual EntityAI *GetLockedTargetForExternal() const { return nullptr; }
+
 	// in-game action menu entry labels, one per line (empty when no menu). For tri tests.
 	virtual RString GetActionMenuTexts() const { return RString(); }
 

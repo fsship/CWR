@@ -1,0 +1,73 @@
+/*
+ * Poseidon LAN 控制台的运行时样式覆盖层。
+ *
+ * 游戏启动后，浏览器每次刷新都会直接读取此文件；修改、保存、刷新页面即可
+ * 生效，无需重新编译 PoseidonGame。此文件也会在构建后复制至 dist/web/。
+ */
+
+:root {
+    --page: #111820;
+    --header: #192631;
+    --panel: #18232d;
+    --panel-border: #314351;
+    --control: #295d84;
+    --control-hover: #397eaf;
+    --text: #d9e3ed;
+    --muted: #9caebc;
+    --locked-bg: #6b4200;
+    --locked-border: #e7a226;
+}
+
+body {
+    background: var(--page);
+    color: var(--text);
+}
+
+header {
+    background: var(--header);
+}
+
+.card {
+    background: var(--panel);
+    border-color: var(--panel-border);
+}
+
+.map-frame,
+textarea,
+#units th {
+    border-color: #425564;
+}
+
+button,
+select {
+    background: var(--control);
+}
+
+button:hover {
+    background: var(--control-hover);
+}
+
+.muted {
+    color: var(--muted);
+}
+
+/* The header stays visible while scrolling the live-unit list. */
+#units th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--panel);
+    box-shadow: 0 1px 0 #425564;
+}
+
+/* A target currently locked by the player is deliberately high contrast. */
+tr.locked-target td {
+    background: var(--locked-bg) !important;
+    color: #fff5d2;
+    font-weight: 700;
+    border-bottom-color: var(--locked-border);
+}
+
+tr.locked-target:hover td {
+    background: #835200 !important;
+}

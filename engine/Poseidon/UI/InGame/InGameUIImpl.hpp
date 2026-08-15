@@ -384,6 +384,7 @@ class InGameUI: public AbstractUI
 	void NextTarget( EntityAI *me ) {FindTarget(me,false);}
 	void PrevTarget( EntityAI *me ) {FindTarget(me,true);}
 	bool LockTargetFromExternal(EntityAI *target) override;
+	EntityAI *GetLockedTargetForExternal() const override;
 
 	void RevealTarget( Target *tgt, float spot );
 

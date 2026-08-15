@@ -84,3 +84,13 @@ set_target_properties(PoseidonGame PROPERTIES
 
 include(${CMAKE_SOURCE_DIR}/cmake/DistCopy.cmake)
 dist_copy(PoseidonGame)
+
+# Dashboard CSS/JS are loaded by the local HTTP server at request time.  Keep
+# them next to the executable so frontend iterations only require a browser
+# refresh, not a C++ rebuild.
+add_custom_command(TARGET PoseidonGame POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${DIST_DIR}/web"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/web" "${DIST_DIR}/web"
+    COMMENT "Copying dashboard web assets to ${DIST_DIR}/web"
+    VERBATIM
+)
