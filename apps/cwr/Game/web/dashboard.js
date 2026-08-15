@@ -7,6 +7,20 @@
 (function () {
     document.documentElement.dataset.poseidonDashboardAssets = "external";
 
+    // Use the browser/OS preference for the initial map palette.  This runs
+    // after the embedded dashboard has created its map controls.
+    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
+    const syncMapTheme = (dark) => {
+        if (typeof darkMapControl === "undefined")
+            return;
+        darkMapControl.checked = dark;
+        darkMap = dark;
+        vectorTiles.clear();
+        draw();
+    };
+    syncMapTheme(systemTheme.matches);
+    systemTheme.addEventListener("change", (event) => syncMapTheme(event.matches));
+
     // Small public hook for local frontend experiments.  It deliberately does
     // not retain game state: a normal browser refresh remains the reliable way
     // to pick up a saved CSS or JavaScript change.
