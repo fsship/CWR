@@ -529,6 +529,9 @@ class EntityAIType: public EntityType
 	float _radarRange;
 	bool _radarIgnoreLOS;
 	bool _radarLockInfantry;
+	// Enables the local player's live-missile HUD overlay for this launcher.
+	// Default false keeps the overlay vehicle-specific.
+	bool _radarMissileHud;
 	// Per-vehicle multiplier for the post-launch unguided interval when a
 	// radar contact is terrain-masked. One preserves normal missile behavior.
 	float _radarTerrainMaskUnguidedMultiplier;
@@ -613,6 +616,7 @@ class EntityAIType: public EntityType
 	__forceinline bool GetRadarScanInfantry() const {return _radarScanInfantry;}
 	__forceinline bool GetRadarIgnoreLOS() const {return _radarIgnoreLOS;}
 	__forceinline bool GetRadarLockInfantry() const {return _radarLockInfantry;}
+	__forceinline bool GetRadarMissileHud() const {return _radarMissileHud;}
 	__forceinline float GetRadarTerrainMaskUnguidedMultiplier() const
 	{
 		return _radarTerrainMaskUnguidedMultiplier;

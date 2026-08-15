@@ -16,6 +16,7 @@
 #include <Poseidon/Core/resincl.hpp>
 
 #include <Poseidon/World/Entities/Infantry/MoveActions.hpp>
+#include <Poseidon/World/Entities/Weapons/Shots.hpp>
 
 #include <Poseidon/UI/Locale/StringtableExt.hpp>
 
@@ -111,6 +112,11 @@ bool InGameUI::DrawMouseCursor(const Camera& camera, AIUnit* unit, bool td)
                        GPreloadedTextures.New(aimed > 0.25 ? CursorLocked : CursorTarget), cursorColor, 1, aimed,
                        _lockTarget, -1, _lockTarget.IdExact() != _target.IdExact(), false, td);
     }
+
+    if (_showCursors)
+    {
+        DrawRadarMissileHud(camera, vehicle);
+    }
     // keep cursor on screen
     // assign cursor direction
     // LOG_DEBUG(UI, "World {:.1f},{:.1f},{:.1f}",_worldCursor[0],_worldCursor[1],_worldCursor[2]);
@@ -165,6 +171,71 @@ bool InGameUI::DrawMouseCursor(const Camera& camera, AIUnit* unit, bool td)
     }
 
     return true;
+}
+
+void InGameUI::DrawRadarMissileHud(const Camera& camera, EntityAI* vehicle)
+{
+    // Missiles are kept in World::_fastVehicles until they explode or are
+    // deleted.  Scanning that small, transient list means the overlay needs no
+    // lifetime bookkeeping: a destroyed missile disappears on the next frame.
+    if (!vehicle->GetType()->GetRadarMissileHud())
+    {
+        return;
+    }
+
+    Matrix4Val camInvTransform = camera.GetInvTransform();
+    const int width = GLOB_ENGINE->Width();
+    const int height = GLOB_ENGINE->Height();
+    const PackedColor markerColor(Color(0.20f, 0.70f, 1.00f, 1.00f));
+    const PackedColor shadowColor(Color(0.00f, 0.00f, 0.00f, 0.85f));
+    constexpr int segments = 16;
+    constexpr float radius = 13.0f;
+
+    for (int i = 0; i < GWorld->NFastVehicles(); ++i)
+    {
+        Missile* missile = dyn_cast<Missile>(GWorld->GetFastVehicle(i));
+        if (!missile || missile->GetOwner() != vehicle)
+        {
+            continue;
+        }
+
+        const Vector3 toMissile = missile->Position() - camera.Position();
+        const Point3 cameraPos = camInvTransform.Rotate(toMissile);
+        if (cameraPos.Z() <= 0)
+        {
+            continue;
+        }
+
+        const float invZ = 1.0f / cameraPos.Z();
+        const float screenX = cameraPos.X() * invZ * camera.InvLeft() * 0.5f + 0.5f;
+        const float screenY = -cameraPos.Y() * invZ * camera.InvTop() * 0.5f + 0.5f;
+        // Unlike a lock frame, a missile marker has no meaningful edge
+        // direction. Keep it on-screen only and avoid drawing huge clipped
+        // coordinates for a missile behind the current view.
+        if (screenX < 0 || screenX > 1 || screenY < 0 || screenY > 1)
+        {
+            continue;
+        }
+
+        const float centerX = screenX * width;
+        const float centerY = screenY * height;
+        for (int segment = 0; segment < segments; ++segment)
+        {
+            const float angle0 = H_PI * 2.0f * segment / segments;
+            const float angle1 = H_PI * 2.0f * (segment + 1) / segments;
+            const float x0 = centerX + cos(angle0) * radius;
+            const float y0 = centerY + sin(angle0) * radius;
+            const float x1 = centerX + cos(angle1) * radius;
+            const float y1 = centerY + sin(angle1) * radius;
+            GLOB_ENGINE->DrawLine(Line2DPixel(x0 + 1, y0 + 1, x1 + 1, y1 + 1), shadowColor, shadowColor);
+            GLOB_ENGINE->DrawLine(Line2DPixel(x0, y0, x1, y1), markerColor, markerColor);
+        }
+
+        Point2DAbs label(centerX + radius + 4, centerY - radius);
+        GEngine->PixelAlignXY(label);
+        GLOB_ENGINE->DrawTextF(label, 0.022f, _font24, markerColor, STR_POS_DIST,
+                               missile->Position().Distance(vehicle->Position()));
+    }
 }
 
 float HowMuchInteresting(AIUnit* unit, const Target* tgt);
@@ -275,10 +346,15 @@ bool InGameUI::DrawTargetInfo(const Camera& camera, AIUnit* unit, Vector3Par dir
         }
     }
 
-    // The radar HMMWV uses a longer initial straight run for a terrain-masked
-    // lock.  Make an active lock unmistakable without changing any other
-    // vehicle's cursor presentation.
-    if (target == _lockTarget && vehicle->GetType()->GetRadarTerrainMaskUnguidedMultiplier() > 1 && _blinkState)
+    // Match the firing rule: only a lock whose actual launch point is
+    // terrain-masked gets the warning. Visible locks keep the normal marker.
+    const int lockedWeapon = vehicle->SelectedWeapon();
+    const bool terrainMaskedLock =
+        target && target->idExact && target == _lockTarget && lockedWeapon >= 0 &&
+        lockedWeapon < vehicle->NMagazineSlots() &&
+        GLandscape->VisibleStrategic(vehicle->PositionModelToWorld(vehicle->GetWeaponCenter(lockedWeapon)),
+                                     target->AimingPosition()) < 0.5f;
+    if (terrainMaskedLock && vehicle->GetType()->GetRadarTerrainMaskUnguidedMultiplier() > 1 && _blinkState)
     {
         Point2DAbs alert(mx + mw - 1, my - mh * 0.35f);
         GEngine->PixelAlignXY(alert);

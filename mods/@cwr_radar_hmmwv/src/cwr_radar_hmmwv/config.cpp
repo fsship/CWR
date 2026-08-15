@@ -118,6 +118,8 @@ class CfgVehicles
         radarRange = 3000;
         radarIgnoreLOS = 1;
         radarLockInfantry = 1;
+        // Blue live-missile marker and launch-vehicle distance on the HUD.
+        radarMissileHud = 1;
         // A terrain-masked radar contact launches on a longer straight run
         // before guidance begins; visible contacts retain normal behavior.
         radarTerrainMaskUnguidedMultiplier = 3;

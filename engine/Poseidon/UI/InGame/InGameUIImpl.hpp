@@ -456,6 +456,7 @@ private:
 	void DrawGroupUnit(AIUnit *u, float xScreen, float yScreen, float alpha, int align);
 	void DrawGroupInfo(EntityAI *vehicle);
 	bool DrawMouseCursor(const Camera &camera, AIUnit *unit, bool td);
+	void DrawRadarMissileHud(const Camera &camera, EntityAI *vehicle);
 	bool DrawTargetInfo
 	(
 		const Camera &camera, AIUnit *unit, Vector3Par dir,
