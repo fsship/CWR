@@ -346,6 +346,28 @@ bool InGameUI::DrawTargetInfo(const Camera& camera, AIUnit* unit, Vector3Par dir
         }
     }
 
+    // Keep the existing lock frame, but make a destroyed lock unambiguous.
+    // Check the entity as well as the asynchronously refreshed Target flag so
+    // the mark appears on the frame immediately after an impact.
+    const bool destroyedLockTarget =
+        target && target == _lockTarget &&
+        (target->destroyed || (target->idExact && target->idExact->IsDammageDestroyed()));
+    if (destroyedLockTarget)
+    {
+        const PackedColor destroyedColor(Color(1.00f, 0.05f, 0.05f, 1.00f));
+        const PackedColor destroyedShadow(Color(0.00f, 0.00f, 0.00f, 0.85f));
+        const float insetX = mw * 0.26f;
+        const float insetY = mh * 0.26f;
+        const float left = mx + insetX;
+        const float top = my + insetY;
+        const float right = mx + mw - insetX;
+        const float bottom = my + mh - insetY;
+        GLOB_ENGINE->DrawLine(Line2DPixel(left + 1, top + 1, right + 1, bottom + 1), destroyedShadow, destroyedShadow);
+        GLOB_ENGINE->DrawLine(Line2DPixel(right + 1, top + 1, left + 1, bottom + 1), destroyedShadow, destroyedShadow);
+        GLOB_ENGINE->DrawLine(Line2DPixel(left, top, right, bottom), destroyedColor, destroyedColor);
+        GLOB_ENGINE->DrawLine(Line2DPixel(right, top, left, bottom), destroyedColor, destroyedColor);
+    }
+
     // Match the firing rule: only a lock whose actual launch point is
     // terrain-masked gets the warning. Visible locks keep the normal marker.
     const int lockedWeapon = vehicle->SelectedWeapon();

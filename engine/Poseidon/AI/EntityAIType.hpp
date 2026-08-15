@@ -529,6 +529,10 @@ class EntityAIType: public EntityType
 	float _radarRange;
 	bool _radarIgnoreLOS;
 	bool _radarLockInfantry;
+	// With an omnidirectional radar, this optional nearer range applies when
+	// terrain blocks the direct line between the sensor and the target.
+	// Zero retains the legacy ignore-LOS behavior.
+	float _radarTerrainMaskedRange;
 	// Enables the local player's live-missile HUD overlay for this launcher.
 	// Default false keeps the overlay vehicle-specific.
 	bool _radarMissileHud;
@@ -616,6 +620,7 @@ class EntityAIType: public EntityType
 	__forceinline bool GetRadarScanInfantry() const {return _radarScanInfantry;}
 	__forceinline bool GetRadarIgnoreLOS() const {return _radarIgnoreLOS;}
 	__forceinline bool GetRadarLockInfantry() const {return _radarLockInfantry;}
+	__forceinline float GetRadarTerrainMaskedRange() const {return _radarTerrainMaskedRange;}
 	__forceinline bool GetRadarMissileHud() const {return _radarMissileHud;}
 	__forceinline float GetRadarTerrainMaskUnguidedMultiplier() const
 	{

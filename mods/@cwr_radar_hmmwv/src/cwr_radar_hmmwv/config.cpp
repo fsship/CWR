@@ -115,9 +115,12 @@ class CfgVehicles
         // Dedicated all-aspect radar. Its fixed range and contact handling
         // are local to this vehicle; no global vehicle or infantry config is
         // modified.
-        radarRange = 3000;
+        // Clear terrain line: 12 km. Terrain-masked contacts deliberately
+        // fall back to a 500 m near-field search instead.
+        radarRange = 12000;
         radarIgnoreLOS = 1;
         radarLockInfantry = 1;
+        radarTerrainMaskedRange = 500;
         // Blue live-missile marker and launch-vehicle distance on the HUD.
         radarMissileHud = 1;
         // A terrain-masked radar contact launches on a longer straight run

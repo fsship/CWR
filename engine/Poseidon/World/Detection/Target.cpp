@@ -617,10 +617,16 @@ float EntityAI::CalcVisibility(EntityAI* ai, float dist2, float* audibility, boo
     }
     if (irScan && type->GetRadarIgnoreLOS())
     {
-        // This is a configured omnidirectional radar contact, not a visual
-        // observation. Keep its range, target-kind and ground-target rules,
-        // but deliberately skip terrain, object, fog, size and view-angle
-        // attenuation for this one sensor type.
+        // This is a configured omnidirectional radar contact. Normally it
+        // deliberately skips terrain, object, fog, size and view-angle
+        // attenuation, but a vehicle may limit terrain-masked contacts to a
+        // shorter local range while keeping its clear-line range unchanged.
+        const float terrainMaskedRange = type->GetRadarTerrainMaskedRange();
+        if (terrainMaskedRange > 0 && dist2 > Square(terrainMaskedRange) &&
+            GLandscape->VisibleStrategic(Position(), ai->AimingPosition()) < 0.5f)
+        {
+            return 0;
+        }
         return 1;
     }
     if (!irScan)
