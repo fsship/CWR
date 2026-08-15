@@ -2435,9 +2435,17 @@ void EntityAI::FireWeaponEffects(int weapon, const Magazine* magazine, EntityAI*
 #endif
     }
 
-    RStringB recoilName = mode->_recoilName;
-    Ref<RecoilFunction> recoil = RecoilFunctions.New(recoilName);
-    StartRecoil(recoil, GetRecoilFactor());
+    // Some legacy vehicle/weapon modes do not define a recoil entry. Passing
+    // their empty RStringB through BankArray eventually calls stricmp with a
+    // null name, so treat the missing cosmetic effect as no recoil instead.
+    if (mode && mode->_recoilName.GetLength() > 0)
+    {
+        Ref<RecoilFunction> recoil = RecoilFunctions.New(mode->_recoilName);
+        if (recoil)
+        {
+            StartRecoil(recoil, GetRecoilFactor());
+        }
+    }
 
     if (IsEventHandler(EEFired))
     {
