@@ -110,7 +110,7 @@ bool InGameUI::DrawMouseCursor(const Camera& camera, AIUnit* unit, bool td)
         // check actual visibility
         DrawTargetInfo(camera, unit, relPos, GPreloadedTextures.New(CursorTarget),
                        GPreloadedTextures.New(aimed > 0.25 ? CursorLocked : CursorTarget), cursorColor, 1, aimed,
-                       _lockTarget, -1, _lockTarget.IdExact() != _target.IdExact(), false, td);
+                       _lockTarget, -1, _lockTarget.IdExact() != _target.IdExact(), false, td, true);
     }
 
     if (_showCursors)
@@ -167,7 +167,7 @@ bool InGameUI::DrawMouseCursor(const Camera& camera, AIUnit* unit, bool td)
             cursorTex2 = GPreloadedTextures.New(cursor2);
         }
         DrawTargetInfo(camera, unit, newDir, cursorTex, cursorTex2, color, textA, textA, _target, _housePos, drawInfo,
-                       ModeIsStrategy(_mode), td);
+                       ModeIsStrategy(_mode), td, false);
     }
 
     return true;
@@ -242,7 +242,7 @@ float HowMuchInteresting(AIUnit* unit, const Target* tgt);
 
 bool InGameUI::DrawTargetInfo(const Camera& camera, AIUnit* unit, Vector3Par dir, Texture* cursor, Texture* cursor2,
                               PackedColor color, float cursorA, float cursor2A, const Target* target, int housePos,
-                              bool info, bool extended, bool td)
+                              bool info, bool extended, bool td, bool lockFrame)
 {
     EntityAI* vehicle = unit->GetVehicle();
 
@@ -257,20 +257,57 @@ bool InGameUI::DrawTargetInfo(const Camera& camera, AIUnit* unit, Vector3Par dir
     const float mScrH = 32.0f / (800 * asp.topFOV);
     const float mScrW = 32.0f / (800 * asp.leftFOV);
 
-    float cx, cy;
+    float cx = 0, cy = 0;
+    bool offscreenLock = false;
+    float edgeDirX = 0, edgeDirY = 0;
     {
         Point3 pos = camInvTransform.Rotate(dir);
         if (pos.Z() <= 0)
         {
-            return false;
+            if (!lockFrame)
+            {
+                return false;
+            }
+            offscreenLock = true;
         }
-        float invZ = 1.0 / pos.Z();
-        cx = pos.X() * invZ * camera.InvLeft();
-        cy = -pos.Y() * invZ * camera.InvTop();
+        else
+        {
+            float invZ = 1.0 / pos.Z();
+            cx = pos.X() * invZ * camera.InvLeft();
+            cy = -pos.Y() * invZ * camera.InvTop();
+        }
     }
 
     float mScrX = cx * 0.5 + 0.5 - mScrW * 0.5;
     float mScrY = cy * 0.5 + 0.5 - mScrH * 0.5;
+    offscreenLock = offscreenLock ||
+                    (lockFrame && (mScrX < 0 || mScrX + mScrW > 1 || mScrY < 0 || mScrY + mScrH > 1));
+    if (offscreenLock)
+    {
+        // Convert the target's camera-relative bearing into a direction on a
+        // rectangular screen edge. This remains meaningful for a target
+        // behind the camera, where perspective projection has no screen point.
+        const float xAngle = atan2(mDir.X(), mDir.Z());
+        const float yAngle = atan2(mDir.Y(), mDir.SizeXZ());
+        edgeDirX = xAngle / floatMax(atan(camera.Left()), 0.001f);
+        edgeDirY = -yAngle / floatMax(atan(camera.Top()), 0.001f);
+        float edgeScale = floatMax(fabs(edgeDirX), fabs(edgeDirY));
+        if (edgeScale < 0.001f)
+        {
+            // Exactly behind has no unique screen-side projection. Use the
+            // bottom edge rather than losing the lock indication altogether.
+            edgeDirY = 1, edgeScale = 1;
+        }
+        edgeDirX /= edgeScale;
+        edgeDirY /= edgeScale;
+
+        float centerX = 0.5f + edgeDirX * 0.5f;
+        float centerY = 0.5f + edgeDirY * 0.5f;
+        saturate(centerX, mScrW * 0.5f + 0.01f, 1.0f - mScrW * 0.5f - 0.01f);
+        saturate(centerY, mScrH * 0.5f + 0.01f, 1.0f - mScrH * 0.5f - 0.01f);
+        mScrX = centerX - mScrW * 0.5f;
+        mScrY = centerY - mScrH * 0.5f;
+    }
     const int w2d = GLOB_ENGINE->Width2D();
     const int h2d = GLOB_ENGINE->Height2D();
 
@@ -346,11 +383,44 @@ bool InGameUI::DrawTargetInfo(const Camera& camera, AIUnit* unit, Vector3Par dir
         }
     }
 
+    if (offscreenLock)
+    {
+        // Draw a small arrow in the edge frame, pointing toward the target.
+        const PackedColor arrowShadow(Color(0.00f, 0.00f, 0.00f, 0.85f));
+        const float centerX = mx + mw * 0.5f;
+        const float centerY = my + mh * 0.5f;
+        const float perpendicularX = -edgeDirY;
+        const float perpendicularY = edgeDirX;
+        const float tipX = centerX + edgeDirX * 10.0f;
+        const float tipY = centerY + edgeDirY * 10.0f;
+        const float baseX = centerX - edgeDirX * 5.0f;
+        const float baseY = centerY - edgeDirY * 5.0f;
+        const float baseLeftX = baseX + perpendicularX * 5.0f;
+        const float baseLeftY = baseY + perpendicularY * 5.0f;
+        const float baseRightX = baseX - perpendicularX * 5.0f;
+        const float baseRightY = baseY - perpendicularY * 5.0f;
+        GLOB_ENGINE->DrawLine(Line2DPixel(tipX + 1, tipY + 1, baseLeftX + 1, baseLeftY + 1), arrowShadow, arrowShadow);
+        GLOB_ENGINE->DrawLine(Line2DPixel(tipX + 1, tipY + 1, baseRightX + 1, baseRightY + 1), arrowShadow, arrowShadow);
+        GLOB_ENGINE->DrawLine(Line2DPixel(tipX, tipY, baseLeftX, baseLeftY), color, color);
+        GLOB_ENGINE->DrawLine(Line2DPixel(tipX, tipY, baseRightX, baseRightY), color, color);
+
+        if (target && target->idExact)
+        {
+            const float distance = target->idExact->AimingPosition().Distance(vehicle->Position());
+            const float labelSize = 0.018f;
+            const float labelWidth = GLOB_ENGINE->GetTextWidthF(labelSize, _font24, STR_POS_DIST, distance);
+            const float labelX = edgeDirX > 0 ? mx - 4 - labelWidth * w3d : mx + mw + 4;
+            Point2DAbs label(labelX, my + mh * 0.15f);
+            GEngine->PixelAlignXY(label);
+            GLOB_ENGINE->DrawTextF(label, labelSize, _font24, color, STR_POS_DIST, distance);
+        }
+    }
+
     // Keep the existing lock frame, but make a destroyed lock unambiguous.
     // Check the entity as well as the asynchronously refreshed Target flag so
     // the mark appears on the frame immediately after an impact.
     const bool destroyedLockTarget =
-        target && target == _lockTarget &&
+        lockFrame && target &&
         (target->destroyed || (target->idExact && target->idExact->IsDammageDestroyed()));
     if (destroyedLockTarget)
     {
@@ -372,7 +442,7 @@ bool InGameUI::DrawTargetInfo(const Camera& camera, AIUnit* unit, Vector3Par dir
     // terrain-masked gets the warning. Visible locks keep the normal marker.
     const int lockedWeapon = vehicle->SelectedWeapon();
     const bool terrainMaskedLock =
-        target && target->idExact && target == _lockTarget && lockedWeapon >= 0 &&
+        lockFrame && target && target->idExact && lockedWeapon >= 0 &&
         lockedWeapon < vehicle->NMagazineSlots() &&
         GLandscape->VisibleStrategic(vehicle->PositionModelToWorld(vehicle->GetWeaponCenter(lockedWeapon)),
                                      target->AimingPosition()) < 0.5f;
@@ -381,6 +451,13 @@ bool InGameUI::DrawTargetInfo(const Camera& camera, AIUnit* unit, Vector3Par dir
         Point2DAbs alert(mx + mw - 1, my - mh * 0.35f);
         GEngine->PixelAlignXY(alert);
         GLOB_ENGINE->DrawText(alert, 0.028f, _font24, color, "!");
+    }
+
+    // Off-screen locks already show their direction and distance. Avoid
+    // rendering the regular name panel beyond the edge of the viewport.
+    if (offscreenLock)
+    {
+        return true;
     }
 
     if (!info)

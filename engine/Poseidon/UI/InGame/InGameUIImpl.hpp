@@ -463,7 +463,7 @@ private:
 		Texture *cursor, Texture *cursor2,
 		PackedColor color, float cursorA, float cursor2A,
 		const Target *target, int housePos,
-		bool info, bool extended, bool td
+		bool info, bool extended, bool td, bool lockFrame
 	);
 	void DrawCursor
 	(
