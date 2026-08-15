@@ -860,6 +860,37 @@ void Missile::SetTerrainGuidanceAltitude(float altitude)
     _terrainGuidancePending = true;
 }
 
+// Unlike VisibleStrategic, this test intentionally ignores GeographyInfo's
+// coarse object-cover allowance. That allowance is useful for AI sighting,
+// but makes a target in a forest or building look terrain-masked forever to a
+// vertical missile approaching its final dive.
+static bool IsTerrainPathClear(Vector3Par from, Vector3Par to)
+{
+    const float distanceXZ = to.DistanceXZ(from);
+    int sampleCount = static_cast<int>(ceil(distanceXZ / 50.0f));
+    if (sampleCount < 2)
+    {
+        return true;
+    }
+    if (sampleCount > 256)
+    {
+        sampleCount = 256;
+    }
+
+    for (int sample = 1; sample < sampleCount; ++sample)
+    {
+        const float t = float(sample) / sampleCount;
+        const float x = from.X() + (to.X() - from.X()) * t;
+        const float z = from.Z() + (to.Z() - from.Z()) * t;
+        const float lineY = from.Y() + (to.Y() - from.Y()) * t;
+        if (GLandscape->SurfaceYAboveWater(x, z) > lineY)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 inline bool FaceIsShining(const Poly& f, const Shape* shape)
 {
     for (int v = 0; v < f.N(); v++)
@@ -1054,7 +1085,7 @@ void Missile::Simulate(float deltaT, SimulationImportance prec)
             _terrainGuidancePending = false;
         }
         else if (Position().Y() >= _terrainGuidanceAltitude &&
-                 GLandscape->VisibleStrategic(Position(), _target->AimingPosition()) >= 0.5f)
+                 IsTerrainPathClear(Position(), _target->AimingPosition()))
         {
             _terrainGuidancePending = false;
         }

@@ -40,7 +40,7 @@ class CfgAmmo
         maxSpeed = 800;
         hit = 5000;
         indirectHit = 1000;
-        indirectHitRange = 0.5;
+        indirectHitRange = 3;
         soundEngine[] = {"\CAS_ah31a\aim9flying.wav", 1, 0};
     };
 };
