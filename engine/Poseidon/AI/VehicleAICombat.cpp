@@ -1884,18 +1884,55 @@ bool EntityAI::FireMissile(int weapon, Vector3Par offset, Vector3Par direction, 
         GetNetworkManager().OnIncomingMissile(target, type->GetName(), this);
     }
 
-    Entity* shot = NewShot(this, type, target);
     const Point3 launchPos = PositionModelToWorld(offset);
+    Vector3 wDirection(NoInit);
+    DirectionModelToWorld(wDirection, direction.Normalized());
+    const bool verticalLaunch = fabs(wDirection * VUp) > 0.99f;
+
+    Entity* shot = NewShot(this, type, target);
     const EntityAIType* launcherType = GetType();
     Missile* missile = dyn_cast<Missile, Vehicle>(shot);
     const float terrainMaskMultiplier = launcherType->GetRadarTerrainMaskUnguidedMultiplier();
     if (missile && target && type->initTime > 0 && launcherType->GetRadarIgnoreLOS() &&
         terrainMaskMultiplier > 1 && GLandscape->VisibleStrategic(launchPos, target->AimingPosition()) < 0.5f)
     {
-        missile->SetGuidanceDelay(type->initTime * terrainMaskMultiplier);
+        const float clearance = launcherType->GetRadarTerrainMaskClearance();
+        if (verticalLaunch && clearance > 0)
+        {
+            const Vector3 targetPos = target->AimingPosition();
+            const float distanceXZ = targetPos.DistanceXZ(launchPos);
+            int sampleCount = static_cast<int>(ceil(distanceXZ / 50.0f));
+            if (sampleCount < 8)
+            {
+                sampleCount = 8;
+            }
+            else if (sampleCount > 256)
+            {
+                sampleCount = 256;
+            }
+
+            // Find the source altitude at which a line to the target clears
+            // every sampled terrain point. The safety margin fades to zero at
+            // the target so a ground target remains reachable in terminal dive.
+            float guidanceAltitude = launchPos.Y();
+            for (int sample = 1; sample < sampleCount; ++sample)
+            {
+                const float t = float(sample) / sampleCount;
+                const float terrainY = GLandscape->SurfaceYAboveWater(
+                    launchPos.X() + (targetPos.X() - launchPos.X()) * t,
+                    launchPos.Z() + (targetPos.Z() - launchPos.Z()) * t);
+                const float sourceAltitude =
+                    (terrainY + clearance * (1.0f - t) - targetPos.Y() * t) / (1.0f - t);
+                saturateMax(guidanceAltitude, sourceAltitude);
+            }
+            missile->SetTerrainGuidanceAltitude(guidanceAltitude);
+        }
+        else
+        {
+            // Oblique launchers retain the original fixed straight-run delay.
+            missile->SetGuidanceDelay(type->initTime * terrainMaskMultiplier);
+        }
     }
-    Vector3 wDirection(NoInit);
-    DirectionModelToWorld(wDirection, direction.Normalized());
     // A vertical launcher makes the direction parallel to the usual world-up
     // reference.  SetDirectionAndUp cannot build an orthogonal frame from two
     // parallel vectors, so use world-forward as the reference in that case.

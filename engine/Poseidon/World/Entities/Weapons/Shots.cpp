@@ -299,6 +299,8 @@ LSError Missile::Serialize(ParamArchive& ar)
     PARAM_CHECK(ar.SerializeEnum("engine", _engine, 1))
     PARAM_CHECK(ar.SerializeEnum("lock", _lock, 1))
     PARAM_CHECK(ar.Serialize("guidanceDelay", _guidanceDelay, 2))
+    PARAM_CHECK(ar.Serialize("terrainGuidanceAltitude", _terrainGuidanceAltitude, 3, 0.0f))
+    PARAM_CHECK(ar.Serialize("terrainGuidancePending", _terrainGuidancePending, 3, false))
     return LSOK;
 }
 
@@ -809,6 +811,7 @@ Missile::Missile(EntityAI* parent, const AmmoType* type, Object* target)
     : Shot(parent, type),
 
       _lock(Locked), _engine(Init), _initTime(type->initTime), _thrustTime(type->thrustTime), _guidanceDelay(0),
+      _terrainGuidanceAltitude(0), _terrainGuidancePending(false),
       _controlDirectionSet(false), _lightColor(0.7, 0.8, 1.0), _target(target)
 //_cloudlets(GLOB_SCENE->Preloaded(CloudletMissile),0.01)
 {
@@ -849,6 +852,12 @@ void Missile::SetGuidanceDelay(float delay)
     {
         _guidanceDelay = delay;
     }
+}
+
+void Missile::SetTerrainGuidanceAltitude(float altitude)
+{
+    _terrainGuidanceAltitude = altitude;
+    _terrainGuidancePending = true;
 }
 
 inline bool FaceIsShining(const Poly& f, const Shape* shape)
@@ -1037,7 +1046,23 @@ void Missile::Simulate(float deltaT, SimulationImportance prec)
     {
         _guidanceDelay -= deltaT;
     }
-    const bool guidanceActive = _guidanceDelay <= 0;
+    bool guidanceActive = _guidanceDelay <= 0;
+    if (guidanceActive && _terrainGuidancePending)
+    {
+        if (!_target)
+        {
+            _terrainGuidancePending = false;
+        }
+        else if (Position().Y() >= _terrainGuidanceAltitude &&
+                 GLandscape->VisibleStrategic(Position(), _target->AimingPosition()) >= 0.5f)
+        {
+            _terrainGuidancePending = false;
+        }
+        else
+        {
+            guidanceActive = false;
+        }
+    }
 
     if (guidanceActive && _lock == Locked && _target && !_target->LockPossible(Type()))
     {

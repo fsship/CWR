@@ -306,6 +306,7 @@ EntityAIType::EntityAIType(const ParamEntry* param) : EntityType(param)
     _radarTerrainMaskedRange = 0;
     _radarMissileHud = false;
     _radarTerrainMaskUnguidedMultiplier = 1;
+    _radarTerrainMaskClearance = 0;
 }
 
 EntityAIType::~EntityAIType()
@@ -494,6 +495,7 @@ void EntityAIType::Load(const ParamEntry& par)
     GET_PAR(radarTerrainMaskedRange);
     GET_PAR(radarMissileHud);
     GET_PAR(radarTerrainMaskUnguidedMultiplier);
+    GET_PAR(radarTerrainMaskClearance);
     GET_PAR(nightVision);
 
     GET_PAR(laserScanner);

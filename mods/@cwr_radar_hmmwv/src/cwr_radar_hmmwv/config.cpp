@@ -123,9 +123,11 @@ class CfgVehicles
         radarTerrainMaskedRange = 500;
         // Blue live-missile marker and launch-vehicle distance on the HUD.
         radarMissileHud = 1;
-        // A terrain-masked radar contact launches on a longer straight run
-        // before guidance begins; visible contacts retain normal behavior.
+        // Terrain-masked 45-degree launches retain a longer straight run.
+        // Vertical launches instead wait until they have cleared the sampled
+        // terrain profile by this many metres before guidance begins.
         radarTerrainMaskUnguidedMultiplier = 3;
+        radarTerrainMaskClearance = 75;
         // This sensor alone may acquire soldiers without globally making
         // infantry (or any other unit type) an IR target.
         radarScanInfantry = 1;

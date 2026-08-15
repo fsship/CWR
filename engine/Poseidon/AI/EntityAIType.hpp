@@ -539,6 +539,9 @@ class EntityAIType: public EntityType
 	// Per-vehicle multiplier for the post-launch unguided interval when a
 	// radar contact is terrain-masked. One preserves normal missile behavior.
 	float _radarTerrainMaskUnguidedMultiplier;
+	// For a vertical missile launch, this is the desired terrain-clearance
+	// margin in metres. Zero keeps the fixed unguided-delay behaviour.
+	float _radarTerrainMaskClearance;
 
 	bool _attendant;
 	bool _nightVision;
@@ -626,6 +629,7 @@ class EntityAIType: public EntityType
 	{
 		return _radarTerrainMaskUnguidedMultiplier;
 	}
+	__forceinline float GetRadarTerrainMaskClearance() const {return _radarTerrainMaskClearance;}
 
 	__forceinline bool GetNightVision() const {return _nightVision;}
 

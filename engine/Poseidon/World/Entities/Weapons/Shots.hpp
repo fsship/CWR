@@ -195,6 +195,8 @@ private:
 
 	float _initTime,_thrustTime;
 	float _guidanceDelay;
+	float _terrainGuidanceAltitude;
+	bool _terrainGuidancePending;
 
 	Color _lightColor;
 	Ref<LightPointOnVehicle> _light;
@@ -223,6 +225,7 @@ private:
 	void Simulate( float deltaT, SimulationImportance prec ) override;
 	void SetControlDirection( Vector3 dir );
 	void SetGuidanceDelay(float delay);
+	void SetTerrainGuidanceAltitude(float altitude);
 
 	LSError Serialize(ParamArchive &ar) override;
 
