@@ -3,6 +3,7 @@
 set(GAME_SOURCES
     WinMain.cpp
     GameApplication.cpp
+    DevHttpServer.cpp
     HighPerformanceGpuHint.cpp
 )
 

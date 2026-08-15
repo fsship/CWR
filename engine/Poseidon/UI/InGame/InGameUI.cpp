@@ -1969,6 +1969,48 @@ void InGameUI::FindTarget(EntityAI* me, bool prev)
     _lockAimValidUntil = Glob.uiTime - 60;
 }
 
+bool InGameUI::LockTargetFromExternal(EntityAI* target)
+{
+    if (!target || target->IsDammageDestroyed())
+    {
+        return false;
+    }
+
+    AIUnit* unit = GWorld ? GWorld->FocusOn() : nullptr;
+    EntityAI* me = unit ? unit->GetVehicle() : nullptr;
+    const TargetList* visibleList = VisibleList();
+    if (!unit || !me || !visibleList || unit->IsFreeSoldier() || unit->IsGunner())
+    {
+        return false;
+    }
+
+    const int weapon = ValidateWeapon(me, me->SelectedWeapon());
+    if (weapon < 0 || me == target || !me->CanRadarScanTarget(target) || !me->CanLock(target))
+    {
+        return false;
+    }
+
+    for (int i = 0; i < visibleList->Size(); ++i)
+    {
+        Target* candidate = (*visibleList)[i];
+        if (!candidate || candidate->idExact.GetLink() != target || candidate->vanished || candidate->destroyed)
+        {
+            continue;
+        }
+        if (!candidate->IsKnownBy(unit))
+        {
+            return false;
+        }
+
+        _lockTarget = candidate;
+        RevealTarget(candidate, 0.3f);
+        _timeSendTarget = Glob.uiTime + 1.0;
+        _lockAimValidUntil = Glob.uiTime - 60;
+        return true;
+    }
+    return false;
+}
+
 #define CameraFrame() GScene->GetCamera()
 // #define CameraFrame() GWorld->CameraOn()
 

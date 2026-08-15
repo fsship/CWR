@@ -68,6 +68,11 @@ public:
 	virtual void ShowHint(RString hint) = 0;
 	virtual bool IsCommandMenuOpen() const { return false; }
 
+	// Requests a normal player target lock from an external UI.  Implementations
+	// must apply the same target-list and weapon checks as the TAB key; callers
+	// use this for local tools such as the developer web map.
+	virtual bool LockTargetFromExternal(EntityAI *target) { (void)target; return false; }
+
 	// in-game action menu entry labels, one per line (empty when no menu). For tri tests.
 	virtual RString GetActionMenuTexts() const { return RString(); }
 

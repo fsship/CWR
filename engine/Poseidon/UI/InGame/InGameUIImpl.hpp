@@ -383,6 +383,7 @@ class InGameUI: public AbstractUI
 	void FindTarget( EntityAI *me, bool prev );
 	void NextTarget( EntityAI *me ) {FindTarget(me,false);}
 	void PrevTarget( EntityAI *me ) {FindTarget(me,true);}
+	bool LockTargetFromExternal(EntityAI *target) override;
 
 	void RevealTarget( Target *tgt, float spot );
 

@@ -1,5 +1,6 @@
 #include <Poseidon/Foundation/Platform/VersionNo.h>
 #include "GameApplication.hpp"
+#include "DevHttpServer.hpp"
 #include <Poseidon/Foundation/Platform/InitBridge.hpp>
 #include <Poseidon/Core/Game/GameLoop.hpp>
 #include <Poseidon/Core/Version.hpp>
@@ -948,6 +949,11 @@ void GameApplication::RunMainLoop()
         LOG_INFO(Core, "Screenshot test mode: waiting for mission to enter gameplay...");
     }
 
+    // This is an intentionally unauthenticated LAN development tool.  Its
+    // worker thread does not touch the world; PumpHttpServer below handles all
+    // snapshots, target requests and scripts from this main thread.
+    Poseidon::Dev::StartHttpServer();
+
 #ifdef _WIN32
     const bool benchmarkMode = AppConfig::Instance().BenchmarkMode();
     const int benchmarkMaxFrames = 300; // ~10s at 30fps
@@ -992,6 +998,7 @@ void GameApplication::RunMainLoop()
     {
         GDebugger.ProcessAlive(); // keep watchdog thread happy
         Poseidon::AppIdle();      // simulate + render one frame
+        Poseidon::Dev::PumpHttpServer();
 
         PollStrictAbort(); // --strict: stop on any ERROR logged this frame
 
@@ -1228,6 +1235,7 @@ void GameApplication::RunMainLoop()
 
         auto frameT0 = TerrainProfile::Now();
         Poseidon::AppIdle();
+        Poseidon::Dev::PumpHttpServer();
         auto frameT1 = TerrainProfile::Now();
 
         // Benchmark FPS tracking (only in arcade/gameplay mode)
@@ -1363,6 +1371,8 @@ void GameApplication::RunMainLoop()
     }
 
 #endif
+
+    Poseidon::Dev::StopHttpServer();
 
     m_validateQuit = true;
     // --strict finalize: an error logged during boot (before the main loop, e.g.
