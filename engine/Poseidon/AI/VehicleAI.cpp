@@ -300,6 +300,10 @@ EntityAIType::EntityAIType(const ParamEntry* param) : EntityType(param)
 {
     _scopeLevel = 0;
     _radarScanInfantry = false;
+    _radarRange = 0;
+    _radarIgnoreLOS = false;
+    _radarLockInfantry = false;
+    _radarTerrainMaskUnguidedMultiplier = 1;
 }
 
 EntityAIType::~EntityAIType()
@@ -482,6 +486,10 @@ void EntityAIType::Load(const ParamEntry& par)
 
     GET_PAR(irScanGround);
     GET_PAR(radarScanInfantry);
+    GET_PAR(radarRange);
+    GET_PAR(radarIgnoreLOS);
+    GET_PAR(radarLockInfantry);
+    GET_PAR(radarTerrainMaskUnguidedMultiplier);
     GET_PAR(nightVision);
 
     GET_PAR(laserScanner);
@@ -666,6 +674,13 @@ bool EntityAI::CanLock(TargetType* type, int weapon) const
     if (!mode->_ammo)
     {
         return false;
+    }
+    if (GetType()->GetRadarLockInfantry() && type->GetType()->IsKindOf(GWorld->Preloaded(VTypeMan)))
+    {
+        // The weapon bank has already passed its normal canLock test. This is
+        // intentionally a sensor-side exemption: it does not turn all Man
+        // classes into global IR targets for other launchers.
+        return true;
     }
     return type->LockPossible(mode->_ammo);
 }

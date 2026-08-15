@@ -298,6 +298,7 @@ LSError Missile::Serialize(ParamArchive& ar)
     PARAM_CHECK(ar.Serialize("thrust", _thrust, 1))
     PARAM_CHECK(ar.SerializeEnum("engine", _engine, 1))
     PARAM_CHECK(ar.SerializeEnum("lock", _lock, 1))
+    PARAM_CHECK(ar.Serialize("guidanceDelay", _guidanceDelay, 2))
     return LSOK;
 }
 
@@ -807,7 +808,7 @@ DEFINE_CASTING(Missile)
 Missile::Missile(EntityAI* parent, const AmmoType* type, Object* target)
     : Shot(parent, type),
 
-      _lock(Locked), _engine(Init), _initTime(type->initTime), _thrustTime(type->thrustTime),
+      _lock(Locked), _engine(Init), _initTime(type->initTime), _thrustTime(type->thrustTime), _guidanceDelay(0),
       _controlDirectionSet(false), _lightColor(0.7, 0.8, 1.0), _target(target)
 //_cloudlets(GLOB_SCENE->Preloaded(CloudletMissile),0.01)
 {
@@ -840,6 +841,14 @@ void Missile::SetControlDirection(Vector3 dir)
 {
     _controlDirection = dir;     // manual missile control
     _controlDirectionSet = true; // manual control activated
+}
+
+void Missile::SetGuidanceDelay(float delay)
+{
+    if (delay > _guidanceDelay)
+    {
+        _guidanceDelay = delay;
+    }
 }
 
 inline bool FaceIsShining(const Poly& f, const Shape* shape)
@@ -1024,12 +1033,18 @@ void Missile::Simulate(float deltaT, SimulationImportance prec)
             break;
     }
 
-    if (_lock == Locked && _target && !_target->LockPossible(Type()))
+    if (_guidanceDelay > 0)
+    {
+        _guidanceDelay -= deltaT;
+    }
+    const bool guidanceActive = _guidanceDelay <= 0;
+
+    if (guidanceActive && _lock == Locked && _target && !_target->LockPossible(Type()))
     {
         _lock = Lost;
     }
     bool forceExplosion = false;
-    if (_lock == Locked)
+    if (guidanceActive && _lock == Locked)
     {
         Vector3 cmdDir;
         float estT = 0.3;

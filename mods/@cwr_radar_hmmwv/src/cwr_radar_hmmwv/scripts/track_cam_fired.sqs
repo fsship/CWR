@@ -1,0 +1,57 @@
+; Track Cam for the Radar HMMWV.
+; Fired EH arguments: [vehicle, weapon, muzzle, mode, ammo].
+
+_launcher = _this select 0
+_ammo = _this select 4
+
+? (_ammo != "CAS_TaticMissile") && (_ammo != "CAS_TaticMissileB") : exit
+? CWRRadarTrackCamEnabled != 1 : exit
+? CWRRadarTrackCamActive == 1 : exit
+? !(player == driver _launcher) : exit
+
+; The Fired event is emitted immediately after the shot is created. Wait for
+; the missile to enter the world, then find that short-lived, nearby object.
+_attempt = 0
+#findMissile
+~0.01
+_missile = NearestObjectDistance [getPos _launcher, _ammo, 250]
+? !(isNull _missile) : goto "trackMissile"
+_attempt = _attempt + 1
+? _attempt < 10 : goto "findMissile"
+exit
+
+#trackMissile
+CWRRadarTrackCamActive = 1
+; Preserve both the exact camera target/type and the caller's time multiplier.
+; cameraView is a read-only command which returns INTERNAL, GUNNER, EXTERNAL,
+; or GROUP; it lets the script restore the view chosen before the launch.
+CWRRadarTrackCamRestoreTarget = cameraOn
+CWRRadarTrackCamRestoreView = cameraView
+CWRRadarTrackCamRestoreAccTime = accTime
+
+; Reuse the game's native third-person path. It follows the missile in the
+; render pass, applies normal mouse look and clips the camera against scenery.
+setAccTime 0.3
+_missile switchCamera "EXTERNAL"
+
+#follow
+? (isNull _missile) : goto "restoreView"
+? !(alive _missile) : goto "restoreView"
+
+~0.02
+goto "follow"
+
+#restoreView
+; Restore the camera target and mode selected before Track Cam, rather than
+; forcing the driver to first-person. Then return to the prior time multiplier.
+? (isNull CWRRadarTrackCamRestoreTarget) : goto "restoreLauncherView"
+CWRRadarTrackCamRestoreTarget switchCamera CWRRadarTrackCamRestoreView
+goto "restoreTime"
+
+#restoreLauncherView
+_launcher switchCamera CWRRadarTrackCamRestoreView
+
+#restoreTime
+setAccTime CWRRadarTrackCamRestoreAccTime
+CWRRadarTrackCamActive = 0
+exit

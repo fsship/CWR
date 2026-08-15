@@ -416,7 +416,7 @@ void TargetList::Manage(AIGroup* group)
             }
             float dist2 = veh->Position().Distance2(ai->Position());
 
-            float irRange = veh->GetType()->GetIRScanRange();
+            float irRange = veh->GetType()->GetRadarScanRange();
             if (!ai || !veh->CanRadarScanTarget(ai))
             {
                 irRange = 0;
@@ -489,7 +489,7 @@ void EntityAI::AddNewTargets(TargetList& res, bool initialize)
         return;
     }
 
-    float irRange = GetType()->GetIRScanRange();
+    float irRange = GetType()->GetRadarScanRange();
     const float maxVisibility2 = Square(floatMax(TACTICAL_VISIBILITY, irRange));
 
     int nv = GLOB_WORLD->NVehicles();
@@ -602,7 +602,7 @@ float EntityAI::CalcVisibility(EntityAI* ai, float dist2, float* audibility, boo
 
     float vis = 1;
     const EntityAIType* type = GetType();
-    float irRange = type->GetIRScanRange();
+    float irRange = type->GetRadarScanRange();
     if (ai->GetType()->GetLaserTarget())
     {
         if (!type->GetLaserScanner())
@@ -614,6 +614,14 @@ float EntityAI::CalcVisibility(EntityAI* ai, float dist2, float* audibility, boo
     if (!type->GetIRScanGround() && !ai->Airborne())
     {
         irScan = false;
+    }
+    if (irScan && type->GetRadarIgnoreLOS())
+    {
+        // This is a configured omnidirectional radar contact, not a visual
+        // observation. Keep its range, target-kind and ground-target rules,
+        // but deliberately skip terrain, object, fog, size and view-angle
+        // attenuation for this one sensor type.
+        return 1;
     }
     if (!irScan)
     {
@@ -734,7 +742,7 @@ void EntityAI::TrackTargets(TargetList& res, AIUnit* unit, int canSee, bool init
     bool notManual = unit->HasAI() && !unit->GetPerson()->IsRemotePlayer();
     float nearestEnemy2 = 1e10;
 
-    float irRange = GetType()->GetIRScanRange();
+    float irRange = GetType()->GetRadarScanRange();
     if (!(canSee & CanSeeRadar))
     {
         irRange = 0;
@@ -1328,7 +1336,7 @@ void EntityAI::WhatIsVisible(TargetList& res, bool initialize)
         newTargetsPeriod = 5.0;
     }
 
-    float trackRange = floatMax(GetType()->GetIRScanRange(), TACTICAL_VISIBILITY);
+    float trackRange = floatMax(GetType()->GetRadarScanRange(), TACTICAL_VISIBILITY);
     float trackCoef = 1;
     if (unit->GetNearestEnemyDist2() > Square(trackRange))
     {
@@ -1366,7 +1374,7 @@ float VisibilityTracker::Value(const EntityAI* sensor, int weapon, float reserve
         _lastTime = Glob.time;
 
         EntityAI* ai = _obj;
-        float irRange = sensor->GetType()->GetIRScanRange();
+        float irRange = sensor->GetType()->GetRadarScanRange();
         if (!sensor->CanRadarScanTarget(ai))
         {
             irRange = 0;

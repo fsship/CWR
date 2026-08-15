@@ -1885,6 +1885,15 @@ bool EntityAI::FireMissile(int weapon, Vector3Par offset, Vector3Par direction, 
     }
 
     Entity* shot = NewShot(this, type, target);
+    const Point3 launchPos = PositionModelToWorld(offset);
+    const EntityAIType* launcherType = GetType();
+    Missile* missile = dyn_cast<Missile, Vehicle>(shot);
+    const float terrainMaskMultiplier = launcherType->GetRadarTerrainMaskUnguidedMultiplier();
+    if (missile && target && type->initTime > 0 && launcherType->GetRadarIgnoreLOS() &&
+        terrainMaskMultiplier > 1 && GLandscape->VisibleStrategic(launchPos, target->AimingPosition()) < 0.5f)
+    {
+        missile->SetGuidanceDelay(type->initTime * terrainMaskMultiplier);
+    }
     Vector3 wDirection(NoInit);
     DirectionModelToWorld(wDirection, direction.Normalized());
     // A vertical launcher makes the direction parallel to the usual world-up
@@ -1893,7 +1902,7 @@ bool EntityAI::FireMissile(int weapon, Vector3Par offset, Vector3Par direction, 
     Vector3Val orientUp = fabs(wDirection * VUp) > 0.99f ? VForward : VUp;
     shot->SetOrient(wDirection, orientUp);
     shot->SetSpeed(_speed + DirectionModelToWorld(initSpeed));
-    shot->SetPosition(PositionModelToWorld(offset));
+    shot->SetPosition(launchPos);
     GLOB_WORLD->AddFastVehicle(shot);
 
     if (GWorld->GetMode() == GModeNetware)

@@ -523,6 +523,15 @@ class EntityAIType: public EntityType
 	// Opt-in sensor extension: permits this observer to acquire Man targets
 	// through its ground-search radar even when the target is not an IR target.
 	bool _radarScanInfantry;
+	// Optional per-vehicle omnidirectional radar. A positive range is absolute
+	// (rather than being derived from tactical visibility); the other flags
+	// deliberately default to false so legacy sensors retain their behaviour.
+	float _radarRange;
+	bool _radarIgnoreLOS;
+	bool _radarLockInfantry;
+	// Per-vehicle multiplier for the post-launch unguided interval when a
+	// radar contact is terrain-masked. One preserves normal missile behavior.
+	float _radarTerrainMaskUnguidedMultiplier;
 
 	bool _attendant;
 	bool _nightVision;
@@ -598,9 +607,16 @@ class EntityAIType: public EntityType
 	__forceinline bool GetIRTarget() const {return _irTarget;} // is IR lock possible?
 	__forceinline bool GetLaserTarget() const {return _laserTarget;} // is laser lock possible?
 	float GetIRScanRange() const;
+	__forceinline float GetRadarScanRange() const {return _radarRange > 0 ? _radarRange : GetIRScanRange();}
 	__forceinline bool GetLaserScanner() const {return _laserScanner;}
 	__forceinline bool GetIRScanGround() const {return _irScanGround;} // IR tracks ground targets
 	__forceinline bool GetRadarScanInfantry() const {return _radarScanInfantry;}
+	__forceinline bool GetRadarIgnoreLOS() const {return _radarIgnoreLOS;}
+	__forceinline bool GetRadarLockInfantry() const {return _radarLockInfantry;}
+	__forceinline float GetRadarTerrainMaskUnguidedMultiplier() const
+	{
+		return _radarTerrainMaskUnguidedMultiplier;
+	}
 
 	__forceinline bool GetNightVision() const {return _nightVision;}
 

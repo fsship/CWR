@@ -1638,6 +1638,27 @@ GameValue ObjSwitchCamera(const GameState* state, GameValuePar oper1, GameValueP
     return NOTHING;
 }
 
+GameValue CameraView(const GameState* /*state*/)
+{
+    if (!GWorld)
+    {
+        return GameValue(RString("INTERNAL"));
+    }
+
+    switch (GWorld->GetCameraTypeWanted())
+    {
+    case CamGunner:
+        return GameValue(RString("GUNNER"));
+    case CamExternal:
+        return GameValue(RString("EXTERNAL"));
+    case CamGroup:
+        return GameValue(RString("GROUP"));
+    case CamInternal:
+    default:
+        return GameValue(RString("INTERNAL"));
+    }
+}
+
 bool ParseEffect(const GameState* state, GameStringType& effect, GameStringType& str, float& speed, GameValuePar oper1)
 {
     const GameArrayType& array = oper1;

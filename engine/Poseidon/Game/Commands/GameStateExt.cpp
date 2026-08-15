@@ -392,6 +392,7 @@ GameValue ShowCinemaBorder(const GameState* state, GameValuePar oper1);
 GameValue Benchmark(const GameState* state);
 GameValue CadetMode(const GameState* state);
 GameValue CameraOn(const GameState* state);
+GameValue CameraView(const GameState* state);
 GameValue ConfigListNames(const GameState* state);
 GameValue ConfigNew(const GameState* state);
 GameValue DayTime(const GameState* state);
@@ -899,6 +900,7 @@ static const GameNular* GetExtNular(int& count)
         GameNular(GameBool, "dialog", IsDialog),
 
         GameNular(GameObject, "cameraOn", CameraOn),
+        GameNular(GameString, "cameraView", CameraView),
 
         GameNular(GameFile, "newConfig", ConfigNew),
         GameNular(GameArray, "listConfigNames", ConfigListNames),

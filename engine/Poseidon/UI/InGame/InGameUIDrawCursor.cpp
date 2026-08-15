@@ -275,6 +275,16 @@ bool InGameUI::DrawTargetInfo(const Camera& camera, AIUnit* unit, Vector3Par dir
         }
     }
 
+    // The radar HMMWV uses a longer initial straight run for a terrain-masked
+    // lock.  Make an active lock unmistakable without changing any other
+    // vehicle's cursor presentation.
+    if (target == _lockTarget && vehicle->GetType()->GetRadarTerrainMaskUnguidedMultiplier() > 1 && _blinkState)
+    {
+        Point2DAbs alert(mx + mw - 1, my - mh * 0.35f);
+        GEngine->PixelAlignXY(alert);
+        GLOB_ENGINE->DrawText(alert, 0.028f, _font24, color, "!");
+    }
+
     if (!info)
     {
         return true;

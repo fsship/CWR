@@ -194,6 +194,7 @@ private:
 	CloudletSource _cloudlets;
 
 	float _initTime,_thrustTime;
+	float _guidanceDelay;
 
 	Color _lightColor;
 	Ref<LightPointOnVehicle> _light;
@@ -221,6 +222,7 @@ private:
 	void Deanimate( int level ) override;
 	void Simulate( float deltaT, SimulationImportance prec ) override;
 	void SetControlDirection( Vector3 dir );
+	void SetGuidanceDelay(float delay);
 
 	LSError Serialize(ParamArchive &ar) override;
 

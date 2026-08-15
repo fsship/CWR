@@ -366,7 +366,7 @@ int SensorList::UpdateCell(SensorRowID r, SensorColID c)
         return 0;
     }
     float dist2 = from->Position().Distance2(to->Position());
-    float irRange = from->GetType()->GetIRScanRange();
+    float irRange = from->GetType()->GetRadarScanRange();
     if (!from->CanRadarScanTarget(to))
     {
         irRange = 0;

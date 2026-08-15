@@ -185,7 +185,7 @@ Target* InGameUI::CheckCursorTarget(Vector3& itPos, Vector3Par cursorDir, const 
     AIGroup* group = subgroup->GetGroup();
     EntityAI* vehicle = unit->GetVehicle();
 
-    float maxVisDist = floatMax(vehicle->GetType()->GetIRScanRange(), TACTICAL_VISIBILITY);
+    float maxVisDist = floatMax(vehicle->GetType()->GetRadarScanRange(), TACTICAL_VISIBILITY);
 
     CollisionBuffer retVal;
     GLandscape->ObjectCollision(retVal, vehicle, nullptr, camera.Position(), camera.Position() + cursorDir * maxVisDist,
@@ -312,7 +312,7 @@ Target* InGameUI::CheckCursorTarget(Vector3& itPos, Vector3Par cursorDir, const 
         {
             // visible only
             // check distance to target
-            float irRange = vehicle->GetType()->GetIRScanRange();
+            float irRange = vehicle->GetType()->GetRadarScanRange();
             if (!veh || !vehicle->CanRadarScanTarget(veh))
             {
                 irRange = 0;
@@ -325,7 +325,7 @@ Target* InGameUI::CheckCursorTarget(Vector3& itPos, Vector3Par cursorDir, const 
                 continue;
             }
             // check LOS to target
-            float vis = GLandscape->Visible(vehicle, veh);
+            float vis = vehicle->GetType()->GetRadarIgnoreLOS() ? 1 : GLandscape->Visible(vehicle, veh);
             if (vis < 0.25)
             {
                 continue;
@@ -1411,7 +1411,7 @@ void InGameUI::SimulateHUD(const Camera& camera, EntityAI* vehicle, CameraType c
                     {
                         continue;
                     }
-                    if (!tar->idExact->LockPossible(ammo))
+                    if (!vehicle->CanLock(tar->idExact))
                     {
                         continue;
                     }

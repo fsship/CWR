@@ -136,7 +136,7 @@ int EntityAI::EstimateAttack(const Vector3& hPos, float height, const EntityAI* 
     if (dist2 > Square(minRange) && dist2 < Square(maxRange))
     {
         EntityAI* ai = _attackTarget->idExact;
-        float irRange = GetType()->GetIRScanRange();
+        float irRange = GetType()->GetRadarScanRange();
         if (!ai)
         {
             return 0;
@@ -163,7 +163,7 @@ int EntityAI::EstimateAttack(const Vector3& hPos, float height, const EntityAI* 
         }
 
         Vector3Val weaponPos = transform * GetWeaponCenter(0);
-        float visible = GLOB_LAND->Visible(weaponPos, who, ai, 1.5);
+        float visible = GetType()->GetRadarIgnoreLOS() ? 1 : GLOB_LAND->Visible(weaponPos, who, ai, 1.5);
 
         improved |= EstVisibility;
 
