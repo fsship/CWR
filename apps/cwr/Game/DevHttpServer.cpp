@@ -706,19 +706,25 @@ private:
                         case MapForestTriangle:
                         {
                             const int direction = toInt(std::atan2(object->Direction().X(), object->Direction().Z()) * 2.0f / H_PI);
-                            forests.push_back({static_cast<uint16_t>(landX), static_cast<uint16_t>(landZ), static_cast<int8_t>(direction)});
+                            // CStaticMap draws north-up, whereas the legacy
+                            // browser triangle codes were derived from the
+                            // south-up map export. Serialize the equivalent
+                            // north-up triangle code instead of exposing the
+                            // raw object rotation.
+                            const int8_t webTriangle = direction == -1 ? 0 : direction == 0 ? -1 : direction == 1 ? 2 : 1;
+                            forests.push_back({static_cast<uint16_t>(landX), static_cast<uint16_t>(landZ), webTriangle});
                             if (direction == -1)
-                                fillTriangle(left, top, left, bottom, right, top);
+                                fillTriangle(left, top, left, bottom, right, bottom);
                             else if (direction == 0)
-                                fillTriangle(left, bottom, right, bottom, left, top);
+                                fillTriangle(left, top, right, top, left, bottom);
                             else if (direction == 1)
-                                fillTriangle(left, bottom, right, bottom, right, top);
+                                fillTriangle(left, top, right, top, right, bottom);
                             else
-                                fillTriangle(left, top, right, bottom, right, top);
+                                fillTriangle(left, bottom, right, top, right, bottom);
                             if (direction == -1)
-                                line(left, bottom, right, top, 102, 205, 0, 1);
-                            else if (direction == 0)
                                 line(left, top, right, bottom, 102, 205, 0, 1);
+                            else if (direction == 0)
+                                line(left, bottom, right, top, 102, 205, 0, 1);
                             else if (direction == 1)
                                 line(left, top, right, bottom, 102, 205, 0, 1);
                             else

@@ -21,6 +21,31 @@
     syncMapTheme(systemTheme.matches);
     systemTheme.addEventListener("change", (event) => syncMapTheme(event.matches));
 
+    const oldStatus = document.querySelector("header .warn");
+    if (oldStatus) {
+        const fullscreenButton = document.createElement("button");
+        fullscreenButton.type = "button";
+        fullscreenButton.className = "fullscreen-toggle";
+        oldStatus.replaceWith(fullscreenButton);
+
+        const updateFullscreenLabel = () => {
+            fullscreenButton.textContent = document.fullscreenElement ? "退出全屏" : "进入全屏";
+        };
+        fullscreenButton.addEventListener("click", async () => {
+            try {
+                if (document.fullscreenElement)
+                    await document.exitFullscreen();
+                else
+                    await document.documentElement.requestFullscreen();
+            } catch (_) {
+                // Browsers may deny fullscreen outside a user gesture.
+                updateFullscreenLabel();
+            }
+        });
+        document.addEventListener("fullscreenchange", updateFullscreenLabel);
+        updateFullscreenLabel();
+    }
+
     // Small public hook for local frontend experiments.  It deliberately does
     // not retain game state: a normal browser refresh remains the reliable way
     // to pick up a saved CSS or JavaScript change.
