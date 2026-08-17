@@ -57,6 +57,20 @@ button:hover {
     color: var(--muted);
 }
 
+.info-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.info-card #info {
+    flex: 1;
+    min-height: 28px;
+    max-height: none;
+    margin-bottom: 0;
+    color: #bde8ff;
+    font: 12px/1.55 ui-monospace, monospace;
+}
+
 /* The header stays visible while scrolling the live-unit list. */
 #units th {
     position: sticky;
