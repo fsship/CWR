@@ -734,8 +734,11 @@ private:
                         case MapTree:
                         {
                             const int x = mapX(object->Position().X()), y = mapY(object->Position().Z());
-                            circle(x, y, 4, 0, 0, 0);
-                            symbols.push_back({mapCoordinate(x), mapCoordinate(y), 1});
+                            // Match the browser's small-tree marker: dense
+                            // woodland remains readable without large circles
+                            // obscuring its forest boundary.
+                            circle(x, y, 3, 0, 0, 0);
+                            symbols.push_back({mapCoordinate(x), mapCoordinate(y), 2});
                             break;
                         }
                         case MapSmallTree:
