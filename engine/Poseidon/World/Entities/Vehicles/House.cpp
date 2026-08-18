@@ -490,26 +490,60 @@ int IPaths::FindNearestPosition(Vector3Par pos, Vector3& ret) const
 
 int IPaths::FindNearestPoint(Vector3Par pos, Vector3& ret, float maxDist2) const
 {
-    Vector3 posModel, retModel;
     const Object* object = GetObject();
-    Matrix4Val invTrans = object->GetInvTransform();
-    posModel = invTrans.FastTransform(pos);
-
     const BuildingType* type = GetBType();
+    if (!object || !type)
+    {
+        ret = VZero;
+        return -1;
+    }
 
-    int paths = object->GetShape()->FindPaths();
-    Shape* pathsLevel = object->GetShape()->PathsLevel();
+    LODShapeWithShadow* shape = object->GetShape();
+    if (!shape)
+    {
+        ret = VZero;
+        return -1;
+    }
+
+    int paths = shape->FindPaths();
+    Shape* pathsLevel = shape->PathsLevel();
+    if (paths < 0 || !pathsLevel)
+    {
+        ret = VZero;
+        return -1;
+    }
+
+    const int pathPointCount = pathsLevel->NPoints();
+    if (pathPointCount <= 0)
+    {
+        ret = VZero;
+        return -1;
+    }
+
+    const auto pointToVertex = [pathsLevel, pathPointCount](int point) -> int
+    {
+        if (point < 0 || point >= pathPointCount)
+        {
+            return -1;
+        }
+        int vertex = pathsLevel->PointToVertex(point);
+        return vertex >= 0 && vertex < pathsLevel->NVertex() ? vertex : -1;
+    };
 
     int index = -1;
 
     int best1 = -1, best2 = -1;
     float dist2Min = maxDist2;
     int n = type->_connections.Size();
+    if (n > pathPointCount)
+    {
+        n = pathPointCount;
+    }
     for (int i = 0; i < n; i++)
     {
         // note: i is "point" index
         // specific point index need not be used
-        int vIndex = pathsLevel->PointToVertex(i);
+        int vIndex = pointToVertex(i);
         if (vIndex < 0)
         {
             continue;
@@ -524,9 +558,19 @@ int IPaths::FindNearestPoint(Vector3Par pos, Vector3& ret, float maxDist2) const
         Vector3 p = pos - b;
         for (int j = 0; j < m; j++)
         {
-            int index = array[j];
-            Vector3 e = GetPosition(index) - b;
-            float t = (e * p) / e.SquareSize();
+            int endPoint = array[j];
+            int endVertex = pointToVertex(endPoint);
+            if (endVertex < 0)
+            {
+                continue;
+            }
+            Vector3 e = object->AnimatePoint(paths, endVertex) - b;
+            float length2 = e.SquareSize();
+            if (length2 <= 1e-6f)
+            {
+                continue;
+            }
+            float t = (e * p) / length2;
             saturate(t, 0, 1);
             Vector3 nearest = b + t * e;
             float dist2 = nearest.Distance2(pos);
@@ -534,7 +578,7 @@ int IPaths::FindNearestPoint(Vector3Par pos, Vector3& ret, float maxDist2) const
             {
                 dist2Min = dist2;
                 best1 = i;
-                best2 = index;
+                best2 = endPoint;
             }
         }
     }
@@ -542,8 +586,15 @@ int IPaths::FindNearestPoint(Vector3Par pos, Vector3& ret, float maxDist2) const
     {
         return -1;
     }
-    Vector3 nearest1 = GetPosition(best1);
-    Vector3 nearest2 = GetPosition(best2);
+    int bestVertex1 = pointToVertex(best1);
+    int bestVertex2 = pointToVertex(best2);
+    if (bestVertex1 < 0 || bestVertex2 < 0)
+    {
+        ret = VZero;
+        return -1;
+    }
+    Vector3 nearest1 = object->AnimatePoint(paths, bestVertex1);
+    Vector3 nearest2 = object->AnimatePoint(paths, bestVertex2);
     if (nearest2.Distance2(pos) < nearest1.Distance2(pos))
     {
         ret = nearest2;
@@ -561,8 +612,12 @@ int IPaths::FindNearestPoint(Vector3Par pos, Vector3& ret, float maxDist2) const
     }
     else
     {
-        int vIndex = pathsLevel->PointToVertex(index);
-        int paths = object->GetShape()->FindPaths();
+        int vIndex = pointToVertex(index);
+        if (vIndex < 0)
+        {
+            ret = VZero;
+            return -1;
+        }
         ret = object->AnimatePoint(paths, vIndex);
     }
     return index;
