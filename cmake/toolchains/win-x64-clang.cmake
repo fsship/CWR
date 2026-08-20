@@ -16,6 +16,14 @@ endif()
 include(${CMAKE_CURRENT_LIST_DIR}/../FindLLVMSanitizer.cmake)
 find_llvm_compilers("x64")
 
+# vcpkg invokes this chainload toolchain in separate CMake processes.  Those
+# processes cannot rely on the parent VS environment to discover mt.exe, so
+# explicitly use the manifest tool shipped alongside our portable LLVM.
+set(_poseidon_llvm_mt "${POSEIDON_LLVM_ROOT}/bin/llvm-mt.exe")
+if(EXISTS "${_poseidon_llvm_mt}")
+    set(CMAKE_MT "${_poseidon_llvm_mt}" CACHE FILEPATH "Manifest tool" FORCE)
+endif()
+
 # 64 bit
 set(CMAKE_C_FLAGS_INIT   "-m64")
 set(CMAKE_CXX_FLAGS_INIT "-m64")
