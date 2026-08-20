@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [switch]$NoSound
+    [switch]$NoSound,
+    [switch]$VR
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,6 +14,10 @@ $arguments = @(
 )
 if ($NoSound) {
     $arguments += "--nosound"
+}
+
+if ($VR) {
+    $arguments += "--vr"
 }
 
 & $game @arguments

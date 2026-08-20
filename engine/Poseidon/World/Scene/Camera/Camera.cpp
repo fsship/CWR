@@ -54,6 +54,12 @@ void Camera::Adjust(Engine* engine)
     _invCTop = 2 / verticalSpan;
     const Coord horizontalOffset = (_cLeft - _cRight) / horizontalSpan;
     const Coord verticalOffset = (_cBottom - _cTop) / verticalSpan;
+    // The legacy transform pipeline first divides view-space coordinates by
+    // these conservative extents.  The screen projection below must multiply
+    // them back in, otherwise a symmetric camera with a narrow FOV is enlarged
+    // by an extra 1 / extent factor (most visible on 3D menu notebooks).
+    const Coord cullHorizontal = floatMax(_cLeft, _cRight);
+    const Coord cullVertical = floatMax(_cTop, _cBottom);
 
     _projectionNormal = MZero;
     _projectionNormal(0, 0) = _invCLeft;
@@ -116,8 +122,8 @@ void Camera::Adjust(Engine* engine)
     // |   0    0    1    0    |   |1|   |       z          |
 
     // guarantee sky and clouds are visible
-    _projection(0, 0) = w / horizontalSpan;
-    _projection(1, 1) = -h / verticalSpan;
+    _projection(0, 0) = w * cullHorizontal / horizontalSpan;
+    _projection(1, 1) = -h * cullVertical / verticalSpan;
     _projection(2, 2) = q;
     _projection(0, 2) = x0 + w * (0.5f + 0.5f * horizontalOffset);
     _projection(1, 2) = y0 + h * (0.5f - 0.5f * verticalOffset);
@@ -126,8 +132,6 @@ void Camera::Adjust(Engine* engine)
     // The legacy clipping transform cannot encode an off-centre frustum.
     // Use the larger extent on each axis so coarse clipping is conservative;
     // the exact asymmetric planes below still reject geometry correctly.
-    const Coord cullHorizontal = floatMax(_cLeft, _cRight);
-    const Coord cullVertical = floatMax(_cTop, _cBottom);
     _scale = Matrix4(MScale, 1 / cullHorizontal, 1 / cullVertical, 1);
     // after easy clipping rescale viewing frustum to get correct screen coordinates
     _invScale = Matrix4(MScale, cullHorizontal, cullVertical, 1);

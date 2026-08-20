@@ -106,6 +106,11 @@ class CfgVehicles
         mountedMaverickRack = 1;
         mountedRackObliqueModel = "\cwr_radar_hmmwv\cwr_radar_rack_45.p3d";
         mountedRackVerticalModel = "\cwr_radar_hmmwv\cwr_radar_rack_90.p3d";
+        // Lower the complete radar/launcher pack 1.8 m. The missile origins
+        // track that height, then extend 35 cm farther out from either side
+        // of the HMMWV so launches clear the vehicle body.
+        mountedRackHeightOffset = -1.80;
+        mountedRackMissileSideOffset = 0.35;
 
         // Functional ground-search radar / laser designation capability.
         irScanRangeMin = 500;

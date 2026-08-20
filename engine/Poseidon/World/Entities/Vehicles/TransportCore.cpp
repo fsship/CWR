@@ -2392,6 +2392,10 @@ void Transport::DrawProxies(int level, ClipFlags clipFlags, const Matrix4& trans
     const float launcherPhase = GetAnimationPhase("LauncherElevation");
     RString mountedRackModel =
         Type()->GetParamEntry() >> (launcherPhase >= 0.5f ? "mountedRackVerticalModel" : "mountedRackObliqueModel");
+    // Keep the externally rendered equipment and its procedural firing
+    // points in one configurable model-space height.  Existing vehicles do
+    // not set this value, so their attachment positions remain unchanged.
+    const float mountedRackHeightOffset = Type()->GetParamEntry() >> "mountedRackHeightOffset";
     if (mountedRackModel.GetLength() > 0)
     {
         LODShapeWithShadow* rackShape = Shapes.New(::GetShapeName(mountedRackModel), false, true);
@@ -2422,7 +2426,8 @@ void Transport::DrawProxies(int level, ClipFlags clipFlags, const Matrix4& trans
                     // must do the same or the rack is drawn around the vehicle
                     // origin instead of on its roof.
                     Matrix4 rackTransform = transform;
-                    rackTransform.SetPosition(transform.FastTransform(rackShape->BoundingCenter()));
+                    rackTransform.SetPosition(
+                        transform.FastTransform(rackShape->BoundingCenter() + Vector3(0.0f, mountedRackHeightOffset, 0.0f)));
                     Matrix4Val rackInvTransform = rackTransform.InverseScaled();
                     rackVisual->PrepareTextures(z2, rackVisual->Special());
                     rackVisual->Draw(this, lights, ClipAll, rackVisual->Special(), rackTransform, rackInvTransform);
@@ -2632,7 +2637,9 @@ Matrix4 Transport::FindMissileTransform(int index, bool& found) const
         // the eight visible hardpoints. Reuse the two four-round banks while
         // preserving their configured launch direction for every round.
         const int slot = (index - 1) % 8;
-        const float sideX = (slot / 4 == 0) ? -1.26f : 1.26f;
+        const float sideSign = (slot / 4 == 0) ? -1.0f : 1.0f;
+        const float mountedRackMissileSideOffset = Type()->GetParamEntry() >> "mountedRackMissileSideOffset";
+        const float sideX = sideSign * (1.26f + mountedRackMissileSideOffset);
         const float column = (slot & 1) ? 0.13f : -0.13f;
         const float row = (slot % 4 < 2) ? 0.11f : -0.11f;
         const float elevation = H_PI * 0.25f + GetAnimationPhase("LauncherElevation") * H_PI * 0.25f;
@@ -2643,7 +2650,8 @@ Matrix4 Transport::FindMissileTransform(int index, bool& found) const
         transform.SetDirectionAside(Vector3(1.0f, 0.0f, 0.0f));
         transform.SetDirectionUp(up);
         transform.SetDirection(direction);
-        transform.SetPosition(Vector3(sideX + column, 1.89f + row, 0.11f));
+        const float mountedRackHeightOffset = Type()->GetParamEntry() >> "mountedRackHeightOffset";
+        transform.SetPosition(Vector3(sideX + column, 1.89f + row + mountedRackHeightOffset, 0.11f));
         found = true;
         return transform;
     }
