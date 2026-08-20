@@ -2404,8 +2404,28 @@ void Transport::DrawProxies(int level, ClipFlags clipFlags, const Matrix4& trans
                 Shape* rackVisual = rackShape->LevelOpaque(rackLevel);
                 if (rackVisual)
                 {
+                    // This model is loaded lazily from DrawProxies, after the
+                    // normal ShapeBank::OptimizeAll pass has already created
+                    // vertex buffers for world objects. Without an explicit
+                    // buffer it falls back to software T&L and reaches GL33 as
+                    // a pre-projected VSScreen mesh. That legacy path cannot
+                    // reliably preserve a vehicle attachment across changing
+                    // HMD views, making the rack appear head-locked. Keep it on
+                    // the same per-eye world/view/projection path as the body.
+                    if (!rackVisual->GetVertexBuffer())
+                        rackVisual->ConvertToVBuffer(VBStatic);
+
+                    // LODShape auto-centres its vertices when it is loaded and
+                    // stores the removed model-space offset in BoundingCenter.
+                    // Object/proxy drawing normally restores that offset in
+                    // the child transform; this direct external-model path
+                    // must do the same or the rack is drawn around the vehicle
+                    // origin instead of on its roof.
+                    Matrix4 rackTransform = transform;
+                    rackTransform.SetPosition(transform.FastTransform(rackShape->BoundingCenter()));
+                    Matrix4Val rackInvTransform = rackTransform.InverseScaled();
                     rackVisual->PrepareTextures(z2, rackVisual->Special());
-                    rackVisual->Draw(this, lights, ClipAll, rackVisual->Special(), transform, invTransform);
+                    rackVisual->Draw(this, lights, ClipAll, rackVisual->Special(), rackTransform, rackInvTransform);
                 }
             }
         }

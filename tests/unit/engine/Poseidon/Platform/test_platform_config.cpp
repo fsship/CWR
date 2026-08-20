@@ -22,6 +22,8 @@ TEST_CASE("appConfig: singleton defaults", "[platform][appConfig]")
     REQUIRE(config.BenchmarkMode() == false);
     REQUIRE(config.NoTextures() == false);
     REQUIRE(config.NoMap() == false);
+    REQUIRE(config.UseVR() == false);
+    REQUIRE(config.GetVREyeCapturePath().empty());
 }
 
 TEST_CASE("config chain: FlashpointCfg defaults to UserDir + CfgName", "[platform][configChain]")

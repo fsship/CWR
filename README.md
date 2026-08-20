@@ -27,6 +27,35 @@ cmake --build build/win-x64-clang-rwdi
 
 On GNU/Linux, use the matching `linux-x64-clang-rwdi` preset.
 
+### Experimental SteamVR mode
+
+On Windows, start SteamVR, connect a headset, and launch the GL33 game with
+`--vr` (or `--steamvr`):
+
+```powershell
+& 'dist/x64-win-rwdi/PoseidonGame.exe' --work-dir 'games-res' --window --vr --no-splash
+```
+
+The desktop window remains as a companion mirror. Each eye is rendered at
+SteamVR's recommended target size with its own physical eye offset and
+asymmetric projection. Headset rotation and position are composed only into the
+render cameras; gameplay, movement, aiming, and character direction remain on
+the keyboard and mouse. In VR, the mouse keeps horizontal turning but no longer
+changes rendered vertical look, which is owned by HMD pitch. Hold numpad `5` for
+one second to recenter the seated view. Hold `Delete` for one second to save
+the next complete left/right-eye pair under the user directory's `VR Captures`
+folder.
+
+Legacy HUD and menu draws are presented on a stereo plane about 0.5 m in front
+of the untracked player camera. This gives the UI a focusable depth while keeping
+head motion out of target selection and other gameplay simulation. The current
+VR mode does not provide controller input. If SteamVR or the headset is
+unavailable, the game logs a warning and continues in desktop mode.
+
+For diagnostics, `--vr-eye-capture <prefix>` writes one left/right PNG pair after
+startup. Captures are downsampled to half size without reducing the images sent
+to the headset.
+
 ## Layout
 
 - [Apps](apps/README.md) - executable targets

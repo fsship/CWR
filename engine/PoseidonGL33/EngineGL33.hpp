@@ -25,6 +25,16 @@ class TextBankGL33;
 #include <Poseidon/Graphics/Rendering/RenderPassDescriptor.hpp>
 #include <PoseidonGL33/SDLEventWindow.hpp>
 
+#include <memory>
+
+#if defined(CWR_HAS_OPENVR)
+class SteamVRGL;
+#else
+class SteamVRGL
+{
+};
+#endif
+
 enum PixelShaderSpecular
 {
     PSSSpecular,
@@ -126,7 +136,8 @@ enum : int
     SlotSpecEn = 19,
     SlotSunEn = 20,
     SlotVpScale = 21,
-    // slots 22..23 reserved
+    SlotUIParams = 22,
+    // slot 23 reserved
     SlotTexMat0 = 24, // 4 vec4s
     SlotTexMat1 = 28, // 4 vec4s
     SlotTexCtrl = 32,
@@ -148,7 +159,8 @@ static_assert(SlotView >= SlotProj + 4, "SlotView overlaps SlotProj");
 static_assert(SlotWorld >= SlotView + 4, "SlotWorld overlaps SlotView");
 static_assert(SlotSunDir >= SlotWorld + 4, "SlotSunDir overlaps SlotWorld");
 static_assert(SlotVpScale >= SlotSunEn + 1, "SlotVpScale overlaps SlotSunEn");
-static_assert(SlotTexMat0 >= SlotVpScale + 1, "SlotTexMat0 overlaps SlotVpScale");
+static_assert(SlotUIParams >= SlotVpScale + 1, "SlotUIParams overlaps SlotVpScale");
+static_assert(SlotTexMat0 >= SlotUIParams + 1, "SlotTexMat0 overlaps SlotUIParams");
 static_assert(SlotTexMat1 >= SlotTexMat0 + 4, "SlotTexMat1 overlaps SlotTexMat0");
 static_assert(SlotTexCtrl >= SlotTexMat1 + 4, "SlotTexCtrl overlaps SlotTexMat1");
 static_assert(SlotLightCount >= SlotTexCtrl + 1, "SlotLightCount overlaps SlotTexCtrl");
@@ -336,6 +348,10 @@ class EngineGL33 : public Engine
   protected:
     // GL context (SDL_GLContext, held as void* to keep SDL out of this header)
     void* _glContext = nullptr;
+    std::unique_ptr<SteamVRGL> _steamVR;
+    Matrix4 _vrUIAnchor;
+    bool _vrUIAnchorValid = false;
+    bool _vrUIRendering = false;
 
     int _prepSpec;
     // Most recently bound TEXTURE1 handle.  Tracks SetMultiTexturing's
@@ -435,6 +451,8 @@ class EngineGL33 : public Engine
     void RenderTargetSize(int& w, int& h) const;
     void ApplyPendingRenderScale();
     void DestroySSAATarget();
+    void ResolveFrameTarget();
+    void BlitResolvedFrameToDefault();
     // Resolve + downsample the scaled target into the default framebuffer and
     // leave it bound for reading.  No-op when SSAA is off.
     void ResolveSSAAToDefault();
@@ -567,6 +585,13 @@ class EngineGL33 : public Engine
     void WorkToBack();
     void BackToFront();
     void CaptureScreenshotIfPending();
+    void InitializeVR();
+    void ShutdownVR();
+    bool GetVRRenderTargetSize(int& width, int& height) const;
+    bool HasVRStereoFrame() const;
+    void SubmitVRFrame(unsigned int sourceFramebuffer, unsigned int sourceReadBuffer, int width, int height);
+    void SubmitVRStereoFrame();
+    void VRPostPresentHandoff();
 
   public:
     EngineGL33(int width, int height, bool windowed, int bpp);
@@ -579,6 +604,19 @@ class EngineGL33 : public Engine
     void FinishDraw() override;
     void NextFrame() override;
     void DrawTestPattern(const char* name) override;
+
+    bool IsVREnabled() const override;
+    void UpdateVRTracking() override;
+    void RecenterVRView() override;
+    bool RequestVREyeCapture() override;
+    void ApplyVRHeadPose(Matrix4& cameraTransform) const override;
+    bool GetVRProjectionTangents(float& horizontal, float& vertical) const override;
+    int GetVRViewCount() const override;
+    void ApplyVREyeOffset(Matrix4& cameraTransform, int eye) const override;
+    bool GetVREyeProjection(int eye, float& left, float& right, float& top, float& bottom) const override;
+    void SetVRUIAnchor(Matrix4Val cameraTransform) override;
+    void SetVRUIRendering(bool rendering) override;
+    void CaptureVRView(int eye) override;
 
     void Pause() override;
     void Restore() override;

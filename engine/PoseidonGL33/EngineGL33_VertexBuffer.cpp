@@ -440,8 +440,11 @@ void EngineGL33::ApplyPendingRenderScale()
     // MSAA sample count and the SSAA scale are both live knobs (dev panel
     // Render tab / GraphicsConfig).  Both default OFF.
     const float want = _pendingRenderScale < 1.001f ? 1.0f : _pendingRenderScale;
-    const int sw = static_cast<int>(winW * want + 0.5f);
-    const int sh = static_cast<int>(winH * want + 0.5f);
+    int baseW = winW;
+    int baseH = winH;
+    const bool vrTarget = GetVRRenderTargetSize(baseW, baseH);
+    const int sw = static_cast<int>(baseW * want + 0.5f);
+    const int sh = static_cast<int>(baseH * want + 0.5f);
     if (SSAAActive() && sw == _ssaaW && sh == _ssaaH && want == _renderScale && _pendingMsaaSamples == _msaaSamples)
         return;
     DestroySSAATarget();
@@ -490,27 +493,39 @@ void EngineGL33::ApplyPendingRenderScale()
     _msaaSamples = static_cast<int>(samples);
     // Alpha-to-coverage gate: the frame target carries the samples now.
     _msaaActive = samples > 1;
-    LOG_INFO(Graphics, "GL33: frame target {}x{} ({}x MSAA, render scale {}), window {}x{}", sw, sh,
-             static_cast<int>(samples), want, winW, winH);
+    LOG_INFO(Graphics, "GL33: frame target {}x{} ({}x MSAA, render scale {}, source={}), window {}x{}", sw, sh,
+             static_cast<int>(samples), want, vrTarget ? "SteamVR" : "window", winW, winH);
 }
 
-void EngineGL33::ResolveSSAAToDefault()
+void EngineGL33::ResolveFrameTarget()
+{
+    if (!SSAAActive())
+        return;
+
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, _ssaaFbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _ssaaResolveFbo);
+    glBlitFramebuffer(0, 0, _ssaaW, _ssaaH, 0, 0, _ssaaW, _ssaaH, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+}
+
+void EngineGL33::BlitResolvedFrameToDefault()
 {
     if (!SSAAActive())
         return;
     int winW = _w, winH = _h;
     if (_sdlWindow)
         SDL_GetWindowSizeInPixels(_sdlWindow, &winW, &winH);
-    // Two blits: a multisample resolve needs equal dimensions, the
-    // downsample needs LINEAR filtering — one glBlitFramebuffer can't do both.
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, _ssaaFbo);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _ssaaResolveFbo);
-    glBlitFramebuffer(0, 0, _ssaaW, _ssaaH, 0, 0, _ssaaW, _ssaaH, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
     glBindFramebuffer(GL_READ_FRAMEBUFFER, _ssaaResolveFbo);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glBlitFramebuffer(0, 0, _ssaaW, _ssaaH, 0, 0, winW, winH, GL_COLOR_BUFFER_BIT, GL_LINEAR);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
     glViewport(0, 0, winW, winH);
+}
+
+void EngineGL33::ResolveSSAAToDefault()
+{
+    ResolveFrameTarget();
+    BlitResolvedFrameToDefault();
 }
 
 void EngineGL33::BindFrameRenderTarget()
@@ -561,11 +576,22 @@ void EngineGL33::CaptureScreenshotIfPending()
 
 void EngineGL33::BackToFront()
 {
-    // SSAA: the game frame (3D + HUD) is complete on the scaled target —
-    // resolve + downsample it into the default framebuffer first, so the
-    // overlay renders at native size and the screenshot reads the final
-    // pixels the user sees.
-    ResolveSSAAToDefault();
+    const bool stereoFrame = HasVRStereoFrame();
+
+    // Resolve at full internal resolution first. SteamVR consumes that image
+    // before it is downsampled into the much smaller companion window.
+    if (stereoFrame)
+    {
+        // CaptureVRView already resolved and copied both eyes. Mirror the most
+        // recently rendered (right-eye) resolve without touching either copy.
+        BlitResolvedFrameToDefault();
+    }
+    else if (SSAAActive())
+    {
+        ResolveFrameTarget();
+        SubmitVRFrame(_ssaaResolveFbo, GL_COLOR_ATTACHMENT0, _ssaaW, _ssaaH);
+        BlitResolvedFrameToDefault();
+    }
 
     // ImGui composites on top of game + HUD.  Render BEFORE the screenshot
     // capture so trident captures include the overlay (same pixels the user
@@ -583,8 +609,24 @@ void EngineGL33::BackToFront()
     // undefined, so the capture has to happen pre-swap.
     CaptureScreenshotIfPending();
 
+    // Target allocation can fall back to the default framebuffer if the GPU
+    // rejects the requested offscreen size. Preserve a functional VR fallback.
+    if (!stereoFrame && !SSAAActive())
+    {
+        int winW = _w;
+        int winH = _h;
+        if (_sdlWindow)
+            SDL_GetWindowSizeInPixels(_sdlWindow, &winW, &winH);
+        SubmitVRFrame(0, GL_BACK, winW, winH);
+    }
+
+    if (stereoFrame)
+        SubmitVRStereoFrame();
+
     if (_glContext && _sdlWindow)
         SDL_GL_SwapWindow(_sdlWindow);
+
+    VRPostPresentHandoff();
 
     // Frame boundary: apply a pending render-scale change and (re)bind the
     // frame render target for the next frame's draws.
@@ -652,4 +694,3 @@ bool EngineGL33::SamplePixel(int x, int y, uint8_t* outRGB)
     outRGB[2] = pixel[2];
     return true;
 }
-

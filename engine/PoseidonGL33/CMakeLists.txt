@@ -2,10 +2,15 @@ file(GLOB_RECURSE POSEIDON_GL33_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
 )
 
+if(NOT WIN32)
+    list(FILTER POSEIDON_GL33_SOURCES EXCLUDE REGEX "/SteamVRGL\\.cpp$")
+endif()
+
 set(POSEIDON_GL33_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/EngineGL33.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/GLVertexAttribLayouts.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SDLEventWindow.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SteamVRGL.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/TextureGL33.hpp
 )
 
@@ -55,6 +60,24 @@ else()
 endif()
 
 if(WIN32)
+    find_path(OPENVR_INCLUDE_DIR NAMES openvr.h REQUIRED)
+    find_library(OPENVR_IMPLIB NAMES openvr_api REQUIRED)
+    find_file(OPENVR_RUNTIME
+        NAMES openvr_api.dll
+        PATHS "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin"
+        NO_DEFAULT_PATH
+        REQUIRED
+    )
+
+    add_library(OpenVR::OpenVR SHARED IMPORTED GLOBAL)
+    set_target_properties(OpenVR::OpenVR PROPERTIES
+        IMPORTED_IMPLIB "${OPENVR_IMPLIB}"
+        IMPORTED_LOCATION "${OPENVR_RUNTIME}"
+        INTERFACE_INCLUDE_DIRECTORIES "${OPENVR_INCLUDE_DIR}"
+    )
+
+    target_link_libraries(PoseidonGL33 PUBLIC OpenVR::OpenVR)
+    target_compile_definitions(PoseidonGL33 PUBLIC CWR_HAS_OPENVR=1)
     target_link_libraries(PoseidonGL33 PUBLIC opengl32)
 else()
     find_package(OpenGL REQUIRED)

@@ -344,6 +344,12 @@ void AppConfig::ParseCommandLine(int argc, char** argv)
 
         displayGroup->add_flag("--no-mouse-grab", _noMouseGrab, "Disable mouse grab (cursor confinement and hiding)");
 
+        displayGroup->add_flag("--vr,--steamvr", _useVR,
+                               "Enable experimental SteamVR HMD output (keyboard and mouse controls)");
+        showOption(displayGroup->add_option("--vr-eye-capture", _vrEyeCapturePath,
+                                            "Capture one pre-compositor PNG per eye using this path prefix"),
+                   CliHelpVisibility::Dev);
+
         showOption(
             displayGroup->add_flag("--old-fonts,--no-freetype", _noFreeType, "Use bitmap fonts instead of FreeType"),
             CliHelpVisibility::Full);
@@ -772,6 +778,8 @@ void AppConfig::ParseCommandLine(int argc, char** argv)
                 _viewerAnimPath = std::filesystem::absolute(_viewerAnimPath).string();
             if (!_screenshotPath.empty())
                 _screenshotPath = std::filesystem::absolute(_screenshotPath).string();
+            if (!_vrEyeCapturePath.empty())
+                _vrEyeCapturePath = std::filesystem::absolute(_vrEyeCapturePath).string();
 
             // --viewer implies skipping splash + menu, and enables loose textures
             // so artists can drop .png/.tga next to the expected .paa.  We also

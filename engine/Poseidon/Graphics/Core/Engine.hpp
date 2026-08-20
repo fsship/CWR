@@ -375,6 +375,36 @@ class Engine : public IGraphicsEngine
     virtual void DrawTestPattern(const char* /*name*/) {} // Harness-only: draw named test pattern
     virtual void NextFrame();                             // swap frames - get ready for next frame
     virtual bool InitDrawDone() { return true; }
+
+    // Experimental VR seam. Backends without an HMD runtime keep the flat
+    // renderer unchanged. The GL backend samples tracking once before world
+    // simulation, then World composes the relative HMD pose onto its normal
+    // keyboard/mouse-controlled camera.
+    virtual bool IsVREnabled() const { return false; }
+    virtual void UpdateVRTracking() {}
+    virtual void RecenterVRView() {}
+    virtual bool RequestVREyeCapture() { return false; }
+    virtual void ApplyVRHeadPose(Matrix4& /*cameraTransform*/) const {}
+    virtual bool GetVRProjectionTangents(float& /*horizontal*/, float& /*vertical*/) const { return false; }
+    virtual int GetVRViewCount() const { return 1; }
+    virtual void ApplyVREyeOffset(Matrix4& /*cameraTransform*/, int /*eye*/) const {}
+    virtual bool GetVREyeProjection(int /*eye*/, float& /*left*/, float& /*right*/, float& /*top*/,
+                                    float& /*bottom*/) const
+    {
+        return false;
+    }
+    // Anchor for the legacy 2D layer when it is presented as a VR panel.
+    // It is the keyboard/mouse gameplay camera before head or eye poses are
+    // applied, so HUD/menu geometry stays in player space instead of being
+    // glued to the headset.
+    virtual void SetVRUIAnchor(Matrix4Val /*cameraTransform*/) {}
+    // Software-transformed 3D geometry and legacy 2D UI both reach the
+    // backend as pre-transformed vertices. World marks the actual HUD/menu
+    // scope explicitly so a VR backend does not mistake sky, effects, or
+    // fallback 3D models for UI panel geometry.
+    virtual void SetVRUIRendering(bool /*rendering*/) {}
+    virtual void CaptureVRView(int /*eye*/) {}
+
     void Pause() override = 0;   // stop and prepare everything for GDI
     void Restore() override = 0; // restore after minimized - before app goes to fullscreen
     virtual void StopAll() {}    // stop all background activity - used before termination

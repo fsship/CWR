@@ -13,13 +13,28 @@ namespace Poseidon
 {
 Camera::Camera()
     : _projection(MIdentity), _scale(MIdentity), _invScale(MIdentity), _scaledInvTransform(MIdentity),
-      _camNormalTrans(M3Identity), _camInvTrans(MIdentity), _userClip(false)
+      _camNormalTrans(M3Identity), _camInvTrans(MIdentity), _cNear(0.1f), _cFar(1000.0f), _cLeft(1.0f),
+      _cRight(1.0f), _cTop(1.0f), _cBottom(1.0f), _userClip(false)
 {
 }
 
 void Camera::SetPerspective(Coord cNear, Coord cFar, Coord cLeft, Coord cTop)
 {
-    _cNear = cNear, _cFar = cFar, _cLeft = cLeft, _cTop = cTop;
+    _cNear = cNear, _cFar = cFar;
+    _cLeft = _cRight = cLeft;
+    _cTop = _cBottom = cTop;
+    _cAddNear = cNear;
+    _cAddFar = cFar;
+}
+
+void Camera::SetPerspectiveAsymmetric(Coord cNear, Coord cFar, Coord cLeft, Coord cRight, Coord cTop,
+                                      Coord cBottom)
+{
+    _cNear = cNear, _cFar = cFar;
+    _cLeft = floatMax(cLeft, 0.01f);
+    _cRight = floatMax(cRight, 0.01f);
+    _cTop = floatMax(cTop, 0.01f);
+    _cBottom = floatMax(cBottom, 0.01f);
     _cAddNear = cNear;
     _cAddFar = cFar;
 }
@@ -33,12 +48,18 @@ void Camera::SetPerspectiveForView(Engine* engine, Coord cNear, Coord cFar, Coor
 
 void Camera::Adjust(Engine* engine)
 {
-    _invCLeft = 1 / _cLeft;
-    _invCTop = 1 / _cTop;
+    const Coord horizontalSpan = _cLeft + _cRight;
+    const Coord verticalSpan = _cTop + _cBottom;
+    _invCLeft = 2 / horizontalSpan;
+    _invCTop = 2 / verticalSpan;
+    const Coord horizontalOffset = (_cLeft - _cRight) / horizontalSpan;
+    const Coord verticalOffset = (_cBottom - _cTop) / verticalSpan;
 
     _projectionNormal = MZero;
     _projectionNormal(0, 0) = _invCLeft;
     _projectionNormal(1, 1) = _invCTop;
+    _projectionNormal(0, 2) = horizontalOffset;
+    _projectionNormal(1, 2) = verticalOffset;
     float ccFar = floatMax(500, _cFar * 1.01);
     if (::Poseidon::GEngine->HasWBuffer() && ::Poseidon::GEngine->IsWBuffer())
     {
@@ -95,16 +116,21 @@ void Camera::Adjust(Engine* engine)
     // |   0    0    1    0    |   |1|   |       z          |
 
     // guarantee sky and clouds are visible
-    _projection(0, 0) = w * 0.5f;
-    _projection(1, 1) = -h * 0.5f;
+    _projection(0, 0) = w / horizontalSpan;
+    _projection(1, 1) = -h / verticalSpan;
     _projection(2, 2) = q;
-    _projection(0, 2) = x0 + w * 0.5f;
-    _projection(1, 2) = y0 + h * 0.5f;
+    _projection(0, 2) = x0 + w * (0.5f + 0.5f * horizontalOffset);
+    _projection(1, 2) = y0 + h * (0.5f - 0.5f * verticalOffset);
     _projection.SetPosition(Vector3(0, 0, -q * _cNear));
 
-    _scale = Matrix4(MScale, _invCLeft, _invCTop, 1);
+    // The legacy clipping transform cannot encode an off-centre frustum.
+    // Use the larger extent on each axis so coarse clipping is conservative;
+    // the exact asymmetric planes below still reject geometry correctly.
+    const Coord cullHorizontal = floatMax(_cLeft, _cRight);
+    const Coord cullVertical = floatMax(_cTop, _cBottom);
+    _scale = Matrix4(MScale, 1 / cullHorizontal, 1 / cullVertical, 1);
     // after easy clipping rescale viewing frustum to get correct screen coordinates
-    _invScale = Matrix4(MScale, _cLeft, _cTop, 1);
+    _invScale = Matrix4(MScale, cullHorizontal, cullVertical, 1);
 
     _scaledInvTransform = _scale * GetInvTransform();
     _camNormalTrans = Matrix3(MNormalTransform, _scaledInvTransform.Orientation());
@@ -113,11 +139,13 @@ void Camera::Adjust(Engine* engine)
 
     // calculate world space clipping planes
     Vector3 pl(+1, 0, _cLeft);
-    Vector3 pt(0, +1, _cTop);
+    Vector3 pt(0, +1, _cBottom);
     pl.Normalize();
     pt.Normalize();
-    Vector3 pr(-pl[0], 0, pl[2]);
-    Vector3 pb(0, -pt[1], pt[2]);
+    Vector3 pr(-1, 0, _cRight);
+    Vector3 pb(0, -1, _cTop);
+    pr.Normalize();
+    pb.Normalize();
 
     Vector3Val pos = Position();
 
@@ -157,10 +185,10 @@ void Camera::Adjust(Engine* engine)
 
     // minX, minY is negative
 
-    Vector3 gl(+1, 0, -_cLeft * minX);
-    Vector3 gt(0, +1, -_cTop * minY);
-    Vector3 gr(-1, 0, +_cLeft * maxX);
-    Vector3 gb(0, -1, +_cTop * maxY);
+    Vector3 gl(+1, 0, -cullHorizontal * minX);
+    Vector3 gt(0, +1, -cullVertical * minY);
+    Vector3 gr(-1, 0, +cullHorizontal * maxX);
+    Vector3 gb(0, -1, +cullVertical * maxY);
 
     // left: we want to find plane that goes through points:
     // o,gl,gl+VUp

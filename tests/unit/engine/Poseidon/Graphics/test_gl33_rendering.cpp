@@ -526,6 +526,25 @@ TEST_CASE("ConvertProjectionMatrix: positive bias adjusts z values (z-buffer pat
     REQUIRE(dst._44 == Catch::Approx(0.0f)); // no affine W
 }
 
+TEST_CASE("ConvertProjectionMatrix: preserves asymmetric projection centre", "[Graphics][Matrix]")
+{
+    Matrix4 src(MZero);
+    src(0, 0) = 1.5f;
+    src(1, 1) = 2.0f;
+    src(0, 2) = 0.125f;
+    src(1, 2) = -0.25f;
+    src(2, 2) = 1.0f;
+    src.SetPosition(Vector3(0.0f, 0.0f, -0.1f));
+
+    GfxMatrix dst = {};
+    ConvertProjectionMatrix(dst, src, 0);
+
+    // The GLSL UBO interprets GfxMatrix storage as column-major. _31/_32
+    // therefore become projection column 2 rows 0/1: offset * view-space Z.
+    REQUIRE(dst._31 == Catch::Approx(0.125f));
+    REQUIRE(dst._32 == Catch::Approx(-0.25f));
+}
+
 // FrameState Layout Tests
 
 TEST_CASE("FrameState: fog and light_disc have default values", "[Graphics][GL33]")

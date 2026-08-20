@@ -75,6 +75,12 @@ public:
 
     bool NoFreeType() const { return _noFreeType; }
 
+    /// Enable the experimental SteamVR presentation and HMD head tracking path.
+    bool UseVR() const { return _useVR; }
+
+    /// Optional base path for a one-shot pair of pre-compositor eye captures.
+    const std::string& GetVREyeCapturePath() const { return _vrEyeCapturePath; }
+
     // Multiplayer
 
     bool IsHostServer() const { return _createServer; }
@@ -361,6 +367,8 @@ private:
     bool _noTextures = false;
     bool _noMouseGrab = false;
     bool _noFreeType = false;
+    bool _useVR = false;
+    std::string _vrEyeCapturePath;
 
     // Multiplayer
     bool _createServer = false;

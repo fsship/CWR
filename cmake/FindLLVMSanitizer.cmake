@@ -46,11 +46,19 @@ function(find_llvm_compilers ARCH)
     
     set(CLANG_CL "${LLVM_ROOT}/bin/clang-cl.exe")
     set(LLVM_RC "${LLVM_ROOT}/bin/llvm-rc.exe")
+    set(LLVM_MT "${LLVM_ROOT}/bin/llvm-mt.exe")
     
     if(EXISTS "${CLANG_CL}")
         set(CMAKE_C_COMPILER "${CLANG_CL}" CACHE FILEPATH "C compiler" FORCE)
         set(CMAKE_CXX_COMPILER "${CLANG_CL}" CACHE FILEPATH "C++ compiler" FORCE)
         set(CMAKE_RC_COMPILER "${LLVM_RC}" CACHE FILEPATH "Resource compiler" FORCE)
+        # CMake's Ninja + clang-cl platform module embeds manifests through
+        # CMAKE_MT. vcpkg configures ports in isolated child processes where a
+        # cached parent value is unavailable, so select the portable LLVM tool
+        # explicitly instead of relying on PATH discovery.
+        if(EXISTS "${LLVM_MT}")
+            set(CMAKE_MT "${LLVM_MT}" CACHE FILEPATH "Manifest tool" FORCE)
+        endif()
         message(STATUS "Found LLVM compilers (${ARCH}): ${CLANG_CL}")
     else()
         message(FATAL_ERROR "clang-cl.exe not found at ${CLANG_CL}")

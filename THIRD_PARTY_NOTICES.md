@@ -341,6 +341,7 @@ noted where pinned by an `overrides` entry in the manifest.
 | mimalloc *(2.2.4)* | MIT | © 2018–2021 Microsoft Corporation, Daan Leijen | <https://github.com/microsoft/mimalloc> |
 | SDL3 | Zlib | © 1997–2025 Sam Lantinga | <https://libsdl.org> |
 | OpenAL Soft | LGPL-2.1-or-later | © the OpenAL Soft authors (Chris Robinson et al.) | <https://openal-soft.org> |
+| OpenVR | BSD-3-Clause | © Valve Corporation | <https://github.com/ValveSoftware/openvr> |
 | Opus | BSD-3-Clause | © 2001–2023 Xiph.Org, Skype Limited, et al. | <https://opus-codec.org> |
 | libogg | BSD-3-Clause | © 2002 Xiph.Org Foundation | <https://xiph.org/ogg> |
 | libvorbis | BSD-3-Clause | © 2002–2020 Xiph.Org Foundation | <https://xiph.org/vorbis> |
@@ -381,7 +382,7 @@ SOFTWARE.
 
 ## 2.2 BSD 3-Clause License
 
-Applies to **CLI11, Opus, libogg, libvorbis, zstd**, each with its own copyright holder as
+Applies to **CLI11, OpenVR, Opus, libogg, libvorbis, zstd**, each with its own copyright holder as
 listed in the table above.
 
 ```

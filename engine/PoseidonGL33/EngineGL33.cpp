@@ -1,7 +1,11 @@
 #include <PoseidonGL33/EngineGL33.hpp>
 #include <Poseidon/Core/Application.hpp>
 #include <Poseidon/Core/Config/EngineConfig.hpp>
+#include <Poseidon/Foundation/Platform/AppConfig.hpp>
 #include <Poseidon/Graphics/Shared/WindowPlacement.hpp>
+#if defined(CWR_HAS_OPENVR)
+#include <PoseidonGL33/SteamVRGL.hpp>
+#endif
 
 #include <SDL3/SDL.h>
 #include <glad/gl.h>
@@ -454,6 +458,7 @@ EngineGL33::EngineGL33(int width, int height, bool windowed, int bpp)
     // something during startup.
     LoadConfig();
     InitGL();
+    InitializeVR();
 }
 
 EngineGL33::ShutdownGuard::~ShutdownGuard()
@@ -474,6 +479,11 @@ EngineGL33::~EngineGL33()
     LOG_INFO(Graphics, "GL33: Destroying engine");
 
     SaveConfig();
+
+    // SteamVR owns an OpenGL texture, so release it while the context is still
+    // current. Letting the unique_ptr fall through normal member destruction
+    // would run after this destructor body has already destroyed the context.
+    ShutdownVR();
 
     DebugOverlay::Shutdown();
 

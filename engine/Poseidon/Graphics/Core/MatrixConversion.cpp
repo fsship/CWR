@@ -93,8 +93,12 @@ void ConvertProjectionMatrix(GfxMatrix& mat, Matrix4Val src, float zBias)
         }
     }
 
-    mat._31 = 0;
-    mat._32 = 0;
+    // GfxMatrix is copied directly into a column-major GLSL mat4. These two
+    // slots are column 2, rows 0 and 1, so they carry the X/Y clip-space
+    // offsets multiplied by view-space Z. Symmetric projections leave both
+    // zero; asymmetric HMD projections require them.
+    mat._31 = src(0, 2);
+    mat._32 = src(1, 2);
     mat._33 = c;
     mat._34 = 1;
 

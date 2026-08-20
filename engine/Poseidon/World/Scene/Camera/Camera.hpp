@@ -23,7 +23,7 @@ class Camera: public FrameBase
 	Matrix3 _camNormalTrans;
 	Matrix4 _camInvTrans;
 
-	Coord _cNear,_cFar,_cLeft,_cTop; // perspective parameters
+	Coord _cNear,_cFar,_cLeft,_cRight,_cTop,_cBottom; // perspective parameters
 	Coord _invCTop,_invCLeft;
 
 	Coord _cAddNear,_cAddFar; // additional clipping planes
@@ -58,6 +58,12 @@ class Camera: public FrameBase
 	(
 		Coord cNear, Coord cFar, Coord cLeft, Coord cTop
 	);
+	// Per-eye VR frustum. All four extents are positive tangents measured
+	// from the eye's forward axis to the corresponding clipping plane.
+	void SetPerspectiveAsymmetric
+	(
+		Coord cNear, Coord cFar, Coord cLeft, Coord cRight, Coord cTop, Coord cBottom
+	);
 	// Perspective from a view FOV with the engine's aspect applied —
 	// the one place aspect enters the camera (left = fov * leftFOV,
 	// top = fov * topFOV from the engine's AspectSettings).
@@ -74,7 +80,9 @@ class Camera: public FrameBase
 	Coord Near() const {return _cNear;}
 	Coord Far() const {return _cFar;}
 	Coord Left() const {return _cLeft;}
+	Coord Right() const {return _cRight;}
 	Coord Top() const {return _cTop;}
+	Coord Bottom() const {return _cBottom;}
 	Coord InvTop() const {return _invCTop;}
 	Coord InvLeft() const {return _invCLeft;}
 	Coord ClipNear() const {return _cNear;}

@@ -13,6 +13,10 @@
     { "name": "sdl3", "version>=": "3.4.10#1" },
     "openal-soft",
     "opus",
+    {
+      "name": "openvr",
+      "platform": "windows"
+    },
     "libogg",
     "libvorbis",
     "enkits",

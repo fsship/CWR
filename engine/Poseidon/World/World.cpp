@@ -1156,7 +1156,11 @@ void World::Simulate(float deltaT, bool& enableDraw)
             saturateMin(_camMaxDist[_camType], 1e10);
 
             {
-                Matrix3 camChange = CameraChange(_camHeading[_camType], _camDive[_camType]);
+                // In VR the mouse keeps horizontal turning/aiming, while HMD
+                // pitch owns the rendered vertical view. Retain vehicle/world
+                // pitch in the base transform; only omit the mouse-look dive.
+                const float cameraDive = GEngine->IsVREnabled() ? 0.0f : _camDive[_camType];
+                Matrix3 camChange = CameraChange(_camHeading[_camType], cameraDive);
                 switch (_camType)
                 {
                     case CamGunner:
@@ -1219,6 +1223,13 @@ void World::Simulate(float deltaT, bool& enableDraw)
         {
             transform = s_triViewTransform;
         }
+
+        // Keep the global gameplay camera free of HMD motion. HUD simulation,
+        // cursor neutral-zone handling, vehicle attachments and gameplay code
+        // all consult this camera between frames; storing the headset pose here
+        // made a sufficiently large head turn look like mouse/camera input.
+        // The tracked pose is composed only into the temporary per-eye render
+        // cameras below.
         camera.SetTransform(transform);
 
         if (cameraVehicle)
@@ -1245,7 +1256,12 @@ void World::Simulate(float deltaT, bool& enableDraw)
         // normal soldier fov is about 0.85
         float cNear = 0.067f / fov;
         saturate(cNear, 0.07f, 0.2f);
-        camera.SetPerspectiveForView(GEngine, cNear, _scene.GetFogMaxRange(), fov);
+        float vrHorizontal = 0.0f;
+        float vrVertical = 0.0f;
+        if (GEngine->GetVRProjectionTangents(vrHorizontal, vrVertical))
+            camera.SetPerspective(cNear, _scene.GetFogMaxRange(), vrHorizontal, vrVertical);
+        else
+            camera.SetPerspectiveForView(GEngine, cNear, _scene.GetFogMaxRange(), fov);
         camera.Adjust(GEngine);
     }
 
@@ -1331,15 +1347,6 @@ void World::Simulate(float deltaT, bool& enableDraw)
         enableDraw = GEngine->IsAbleToDraw();
     }
     perf.Mark(Dev::FrameProfiler::PhaseSetup);
-    if (enableDraw)
-    {
-        PackedColor color(GEngine->FogColor());
-        // Viewer mode: solid charcoal background — no fog-color cast on the model
-        // (same reasoning as Blender/Maya default mid-grey backgrounds).
-        if (AppConfig::Instance().IsViewerMode())
-            color = PackedColor(Color(0.18f, 0.18f, 0.20f, 1.0f));
-        GEngine->InitDraw(clear, color);
-    }
 
     bool doSim = IsSimulationEnabled();
 
@@ -1349,6 +1356,51 @@ void World::Simulate(float deltaT, bool& enableDraw)
         _secThread->StartSecondary(DoBackgroundSimulate, &context);
     }
 #endif
+
+    // Simulation advances once, but an active HMD renders this prepared world
+    // twice. Each pass starts from the keyboard/mouse gameplay camera, composes
+    // the tracked head pose and physical eye offset only for drawing, and uses
+    // its own asymmetric lens projection. The untracked centre camera remains
+    // visible to gameplay, HUD simulation and attachment updates.
+    const Camera centreCamera = *_scene.GetCamera();
+    const int renderViewCount = enableDraw ? GEngine->GetVRViewCount() : 1;
+    if (renderViewCount > 1)
+        GEngine->SetVRUIAnchor(centreCamera.Transform());
+    auto renderView = [&](int renderViewIndex)
+    {
+        if (renderViewCount > 1)
+        {
+            Camera& renderCamera = *_scene.GetCamera();
+            renderCamera = centreCamera;
+            Matrix4 eyeTransform = renderCamera.Transform();
+            GEngine->ApplyVRHeadPose(eyeTransform);
+            GEngine->ApplyVREyeOffset(eyeTransform, renderViewIndex);
+            renderCamera.SetTransform(eyeTransform);
+
+            float left = 0.0f;
+            float right = 0.0f;
+            float top = 0.0f;
+            float bottom = 0.0f;
+            if (GEngine->GetVREyeProjection(renderViewIndex, left, right, top, bottom))
+            {
+                renderCamera.SetPerspectiveAsymmetric(renderCamera.Near(), renderCamera.Far(), left, right, top,
+                                                      bottom);
+            }
+            // Transform-dependent clipping planes and camera matrices must be
+            // rebuilt even if a runtime temporarily retains the centre-eye
+            // projection.
+            renderCamera.Adjust(GEngine);
+        }
+
+    if (enableDraw)
+    {
+        PackedColor color(GEngine->FogColor());
+        // Viewer mode: solid charcoal background — no fog-color cast on the model
+        // (same reasoning as Blender/Maya default mid-grey backgrounds).
+        if (AppConfig::Instance().IsViewerMode())
+            color = PackedColor(Color(0.18f, 0.18f, 0.20f, 1.0f));
+        GEngine->InitDraw(clear, color);
+    }
 
     if (enableDraw)
     {
@@ -1562,6 +1614,12 @@ void World::Simulate(float deltaT, bool& enableDraw)
 
     if (enableDraw)
     {
+        // The GL backend must distinguish true HUD/menu pixels from the
+        // pre-transformed vertex path also used by clipped sky, effects and
+        // software-T&L 3D models. Only this scope is projected onto the 0.5 m
+        // VR panel.
+        GEngine->SetVRUIRendering(true);
+
         if (_map && (_showMap || _forceMap))
         {
             _map->DrawHUD(camAI, 1);
@@ -1581,7 +1639,16 @@ void World::Simulate(float deltaT, bool& enableDraw)
                     person->DrawNVOptics();
                 }
 
-                _ui->DrawHUD(*_scene.GetCamera(), camAI, _camType);
+                // VSScreen presents the legacy HUD on a player-camera-anchored
+                // plane in VR. World-linked 2D markers (locked targets, missile
+                // radar pips, group icons, and so on) must therefore be laid
+                // out with the untracked centre camera. Using the current eye
+                // camera here applies the HMD rotation once while calculating
+                // screen coordinates and a second time while projecting the
+                // panel, which makes their motion look reversed when the user
+                // rolls or turns their head.
+                const Camera& hudCamera = renderViewCount > 1 ? centreCamera : *_scene.GetCamera();
+                _ui->DrawHUD(hudCamera, camAI, _camType);
             }
             else if (camVehicle)
             {
@@ -1652,12 +1719,24 @@ void World::Simulate(float deltaT, bool& enableDraw)
                 _titleEffect->Draw();
             }
         }
+
+        GEngine->SetVRUIRendering(false);
     } // if (enableDraw)
 
     if (enableDraw)
     {
         GEngine->FinishDraw();
+        if (renderViewCount > 1)
+            GEngine->CaptureVRView(renderViewIndex);
     }
+
+    };
+
+    for (int renderViewIndex = 0; renderViewIndex < renderViewCount; ++renderViewIndex)
+        renderView(renderViewIndex);
+
+    if (renderViewCount > 1)
+        *_scene.GetCamera() = centreCamera;
 
     perf.Mark(Dev::FrameProfiler::PhaseHud);
 

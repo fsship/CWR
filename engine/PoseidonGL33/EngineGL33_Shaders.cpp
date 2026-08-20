@@ -37,6 +37,8 @@ layout(std140) uniform VSConstants {
     vec4 _pad_specEn;   // 19
     vec4 _pad_sunEn;    // 20
     vec4 vpScale;       // 21 — {2/width, 2/height, 0, 0}
+    vec4 uiParams;      // 22 — {halfWidth, halfHeight, distance, enabled}
+    vec4 _pad23;
 };
 
 layout(location = 0) in vec3 aPos;
@@ -54,11 +56,24 @@ out float vFogTC;
 out vec3 vWorldRel;
 
 void main() {
-    float w = 1.0 / aRhw;
-    gl_Position.x = (aPos.x * vpScale.x - 1.0) * w;
-    gl_Position.y = (1.0 - aPos.y * vpScale.y) * w;
-    gl_Position.z = aPos.z * w;
-    gl_Position.w = w;
+    if (uiParams.w > 0.5) {
+        // Reinterpret the legacy pixel layer as a flat panel anchored to the
+        // keyboard/mouse camera. Its world transform is uploaded into
+        // _pad_world; the current per-eye projection/view then supplies both
+        // correct convergence and natural parallax as the head moves.
+        vec2 panelNdc = vec2(aPos.x * vpScale.x - 1.0,
+                             1.0 - aPos.y * vpScale.y);
+        vec4 panelPos = vec4(panelNdc.x * uiParams.x,
+                             panelNdc.y * uiParams.y,
+                             uiParams.z, 1.0);
+        gl_Position = _pad_proj * _pad_view * _pad_world * panelPos;
+    } else {
+        float w = 1.0 / aRhw;
+        gl_Position.x = (aPos.x * vpScale.x - 1.0) * w;
+        gl_Position.y = (1.0 - aPos.y * vpScale.y) * w;
+        gl_Position.z = aPos.z * w;
+        gl_Position.w = w;
+    }
     vColor = aColor;
     vSpecColor = aSpecular;
     vUV0 = aUV0;
@@ -85,7 +100,7 @@ layout(std140) uniform VSConstants {
     vec4 specEn;        // c19: {enabled, 0, 0, 0}
     vec4 sunEn;         // c20: {enabled, 0, 0, 0}
     vec4 vpScale;       // c21: {2/width, 2/height, 0, 0} — VSScreen only, declared here for layout parity
-    vec4 _pad22;
+    vec4 uiParams;      // c22: VSScreen VR panel parameters
     vec4 _pad23;
     mat4 texMat0;       // c24-c27
     mat4 texMat1;       // c28-c31
@@ -884,8 +899,48 @@ void EngineGL33::SelectVertexShader(VertexShaderID vs)
 void EngineGL33::UploadVSScreenConstants()
 {
     float vpScale[4] = {2.0f / _w, 2.0f / _h, 0, 0};
+    float uiParams[4] = {};
     memcpy(s_vsShadow + VSConst::SlotVpScale * 4, vpScale, 16);
+
+    // Only actual HUD/menu draws belong on the player-anchored VR panel.
+    // Software T&L also emits VSScreen vertices for clipped sky geometry,
+    // effects, decals and models without a hardware vertex buffer; those
+    // vertices have already been projected by the current eye camera and must
+    // retain the ordinary pre-transformed path.
+    constexpr float vrUIDistance = 0.5f;
+    float horizontal = 0.0f;
+    float vertical = 0.0f;
+    if (_vrUIRendering && _vrUIAnchorValid && IsVREnabled() && GScene && GScene->GetCamera() &&
+        GetVRProjectionTangents(horizontal, vertical))
+    {
+        GfxMatrix uiWorld;
+        ConvertMatrix(uiWorld, _vrUIAnchor);
+        uiWorld._41 -= _frameState.cameraPos[0];
+        uiWorld._42 -= _frameState.cameraPos[1];
+        uiWorld._43 -= _frameState.cameraPos[2];
+        memcpy(s_vsShadow + VSConst::SlotWorld * 4, &uiWorld, 64);
+
+        uiParams[0] = horizontal * vrUIDistance;
+        uiParams[1] = vertical * vrUIDistance;
+        uiParams[2] = vrUIDistance;
+        uiParams[3] = 1.0f;
+    }
+    memcpy(s_vsShadow + VSConst::SlotUIParams * 4, uiParams, 16);
     FlushVSConstants();
+}
+
+void EngineGL33::SetVRUIRendering(bool rendering)
+{
+    if (_vrUIRendering == rendering)
+        return;
+
+    // VSScreen queues can contain either already-projected 3D or UI. Commit
+    // the old category before changing the shared shader constant, then make
+    // the new value visible even when BeginScreenPass is already active.
+    FlushAndFreeAllQueues(_queueNo, true);
+    _vrUIRendering = rendering;
+    if (!IsIn3DPass())
+        UploadVSScreenConstants();
 }
 
 FrameState EngineGL33::BuildFrameState(Camera* camera, LightSun* sun, int bias, const Color& fogColor, bool sunEnabled)

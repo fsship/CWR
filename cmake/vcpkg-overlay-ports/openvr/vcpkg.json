@@ -1,0 +1,8 @@
+{
+  "name": "openvr",
+  "version": "2.15.6",
+  "description": "OpenVR SDK import library, runtime bridge, and headers.",
+  "homepage": "https://github.com/ValveSoftware/openvr",
+  "license": "BSD-3-Clause",
+  "supports": "windows & !uwp & (x64 | x86)"
+}

@@ -89,6 +89,47 @@ function(dist_copy TARGET)
     unset(_link_libraries)
     unset(_link_library)
 
+    # OpenVR is a prebuilt dynamic SDK/runtime bridge. Any executable that
+    # links the GL33 backend needs openvr_api.dll beside it even when --vr is
+    # not selected, because the Windows loader resolves the import at startup.
+    set(_copy_openvr_runtime OFF)
+    get_target_property(_link_libraries ${TARGET} LINK_LIBRARIES)
+    if(_link_libraries)
+        foreach(_link_library IN LISTS _link_libraries)
+            if(_link_library STREQUAL "PoseidonGL33" OR _link_library STREQUAL "OpenVR::OpenVR")
+                set(_copy_openvr_runtime ON)
+            endif()
+        endforeach()
+    endif()
+    if(WIN32 AND TARGET OpenVR::OpenVR AND _copy_openvr_runtime)
+        get_target_property(_openvr_dll OpenVR::OpenVR IMPORTED_LOCATION)
+        if(_openvr_dll AND _openvr_dll MATCHES "\\.dll$")
+            add_custom_command(TARGET ${TARGET} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${_openvr_dll}" "${DIST_DIR}"
+                VERBATIM
+            )
+
+            get_filename_component(_openvr_bin_dir "${_openvr_dll}" DIRECTORY)
+            get_filename_component(_openvr_triplet_dir "${_openvr_bin_dir}" DIRECTORY)
+            set(_openvr_copyright "${_openvr_triplet_dir}/share/openvr/copyright")
+            if(EXISTS "${_openvr_copyright}")
+                add_custom_command(TARGET ${TARGET} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${_openvr_copyright}" "${DIST_DIR}/OpenVR.LICENSE.txt"
+                    VERBATIM
+                )
+            endif()
+        endif()
+        unset(_openvr_dll)
+        unset(_openvr_bin_dir)
+        unset(_openvr_triplet_dir)
+        unset(_openvr_copyright)
+    endif()
+    unset(_copy_openvr_runtime)
+    unset(_link_libraries)
+    unset(_link_library)
+
     # Copy extra files from the target's source directory
     foreach(_extra ${ARG_EXTRA})
         get_filename_component(_name "${_extra}" NAME)

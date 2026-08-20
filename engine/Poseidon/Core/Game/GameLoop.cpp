@@ -71,6 +71,68 @@ void RenderFrame(float deltaT, bool enableDraw)
     int startTime = Poseidon::Foundation::GlobalTickCount();
     GDebugger.NextAliveExpected(10000);
 
+    // Holding keypad 5 for one second recenters the HMD once per press. SDL's
+    // physical scancode keeps this independent of Num Lock and keyboard layout.
+    static DWORD vrRecenterHoldStart = 0;
+    static bool vrRecenterHeld = false;
+    static bool vrRecenterTriggered = false;
+    const bool vrRecenterDown =
+        GEngine && GEngine->IsVREnabled() && InputSubsystem::Instance().IsKeyDown(SDL_SCANCODE_KP_5);
+    if (vrRecenterDown)
+    {
+        const DWORD now = static_cast<DWORD>(Poseidon::Foundation::GlobalTickCount());
+        if (!vrRecenterHeld)
+        {
+            vrRecenterHeld = true;
+            vrRecenterHoldStart = now;
+        }
+        else if (!vrRecenterTriggered && now - vrRecenterHoldStart >= 1000)
+        {
+            GEngine->RecenterVRView();
+            GlobalShowMessage(1000, "VR view recentered");
+            vrRecenterTriggered = true;
+        }
+    }
+    else
+    {
+        vrRecenterHeld = false;
+        vrRecenterTriggered = false;
+    }
+
+    // Holding Delete for one second saves the next complete stereo pair.
+    // Trigger once per press so keeping the key down cannot flood the disk.
+    static DWORD vrCaptureHoldStart = 0;
+    static bool vrCaptureHeld = false;
+    static bool vrCaptureTriggered = false;
+    const bool vrCaptureDown =
+        GEngine && GEngine->IsVREnabled() && InputSubsystem::Instance().IsKeyDown(SDL_SCANCODE_DELETE);
+    if (vrCaptureDown)
+    {
+        const DWORD now = static_cast<DWORD>(Poseidon::Foundation::GlobalTickCount());
+        if (!vrCaptureHeld)
+        {
+            vrCaptureHeld = true;
+            vrCaptureHoldStart = now;
+        }
+        else if (!vrCaptureTriggered && now - vrCaptureHoldStart >= 1000)
+        {
+            const bool requested = GEngine->RequestVREyeCapture();
+            GlobalShowMessage(1500, requested ? "VR eye capture requested" : "VR eye capture already pending");
+            vrCaptureTriggered = true;
+        }
+    }
+    else
+    {
+        vrCaptureHeld = false;
+        vrCaptureTriggered = false;
+    }
+
+    // SteamVR's WaitGetPoses is the frame-pacing/tracking seam. Sample it
+    // immediately before World builds the camera so head motion is as fresh as
+    // possible; non-VR backends implement this as a no-op.
+    if (GEngine)
+        GEngine->UpdateVRTracking();
+
     GWorld->SetSimulationFocus(enableDraw);
     GWorld->Simulate(deltaT, enableDraw);
 
